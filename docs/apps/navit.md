@@ -4,7 +4,7 @@
 
 ![Choosing the maps](../img/navit-picker.png) ![Navit with a map of Rome, night colours](../img/navit-map.png)
 
-Status: works in the emulator ✅ (2026-11-17). Navit loads two maps at once, draws them, and follows the GPS position while the unit's own navigation is running. Never tried on a real unit; routing and voice output not tried.
+Status: works in the emulator ✅ (2026-11-17). Navit loads two maps at once, draws them, follows the GPS position while the unit's own navigation is running, finds an address and computes a route with turn-by-turn instructions. Never tried on a real unit; driving along a route and voice output not tried.
 
 The idea comes from [hupog/seat-portable-system-revival](https://github.com/hupog/seat-portable-system-revival), who first ran Navit on this hardware (a Seat Portable System), there as a *replacement* for the navigation.
 
@@ -27,7 +27,8 @@ Be patient: in the emulator Navit takes 2–3 minutes to appear, because QEMU ha
 - **Choosing maps.** The first screen lists every map it finds, on the flash disk and on the SD card. Tick the ones you need: Navit uses all of them together, also for routes that cross from one to the next. Your choice is remembered for next time.
 - **Navit's menu.** Tap the map. *Actions* is where you set a destination; *Settings → Maps* switches the loaded maps on and off; **Quit** takes you back to the VW menu.
 - **Getting back to the VW menu.** Navit fills the screen and has no button for the VW menu, so Quit is the way back. If Navit is still running when you tap its menu entry, the VW menu brings it to the front instead of starting it twice.
-- **Day and night.** Navit switches between light and dark map colours by itself, from the sun's position.
+- **Setting a destination.** *Actions → Town*. First tap the small icon left of the text field and choose the country: on this system Navit cannot tell which country you are in, and without one it finds no town. Then type the town, pick it, choose *Streets*, type part of the street name (any word of it, e.g. "castro" finds "Via Castro Pretorio"), pick it, and tap *Set as destination*. Navit computes the route and starts guiding: next turn top left, distance and arrival time top right; *Route → Description* lists every turn ✅ emulator (a 5.5 km route across Rome). House numbers work only where OpenStreetMap has them, and many Italian streets have none.
+- **Day and night.** Navit switches between light and dark map colours by itself, from the sun's position. If the map ever shows nothing but the route, *Settings → Display → Layout* is set to "Route" (a style that draws only the route line): choose "Car".
 
 ## Maps
 
