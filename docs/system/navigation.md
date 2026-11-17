@@ -318,6 +318,8 @@ NMEA parser (`CoreConfig.ini`, field names = variables filled):
 - Commands written to the receiver ✅ strings: ST `$PSTMCOLD*1E`, `$PSTMWARM*13`, `$PSTMHOT*49`, `$PSTMWALKINGONOFF,1*18` / `,0*19` (pedestrian mode), `$PSTMSTAGPSSETSEED,…` (assisted-GPS seed from the LIVE "InstantFix" service, answers `…SEEDOK` / `…SEEDERROR`); SiRF `$PSRF101,…` (cold / warm / hot / factory), `$PSRF207`. `GPS/DeviceType` selects the set 🟡.
 - First fix: `FirstGpsFix` flag in user settings; the system clock is set from GPS (`SetSystemTime`, `Time/SetOnFirstGPS`); the fix state is announced with AppCom msg 22 (§8.1).
 
+Navigon keeps `COM2:` open and the port admits one reader ✅; another program can read the same sentences from `COM4:` ([hardware-layer.md](hardware-layer.md) §6.5, [navit.md](../apps/navit.md) §4).
+
 ### 3.3 No-GPS supervision ✅ (the logic the emulator defuses)
 
 Started together with the receiver (`0x459110`): if `NoGpsCheckTime` > 0, a repeating timer of that many seconds runs command `0x459878`:
@@ -670,7 +672,7 @@ Data formats a re-implementation could reuse:
 | TMC location tables `map\TMC.nfs` | NgFs container; inner format ❓ |
 | Settings XML / ini | plain text (§2) |
 
-So an own navigation has to bring its own maps (e.g. OSM-based, as the Navit port on the sister unit does) unless the `.tbi` family is reversed.
+So an own navigation has to bring its own maps (e.g. OSM-based, as the Navit port on the sister unit does) unless the `.tbi` family is reversed. This kit's Navit app with OpenStreetMap maps: [navit.md](../apps/navit.md).
 
 ## Open questions
 

@@ -47,9 +47,9 @@ The programs in `guest/`:
 
 | Program | Role |
 |---|---|
-| `launch.exe` | what `emu up` double-clicks: hides the taskbar, adds `COM2:`/`COM3:`, starts the agent and the VW processes (car link, brand program, menu, phone hidden; like the unit's watchdog it waits for the brand program to finish before starting the menu); then sends the phone its language (AppCom msg 2, `LANGUAGE` in `launch.c`, default `eng-GBR`), which on the unit comes from navigon |
+| `launch.exe` | what `emu up` double-clicks: hides the taskbar, adds `COM2:`/`COM3:`, takes over `COM1:` and adds `COM4:` (the GPS copy, below), starts the agent and the VW processes (car link, brand program, menu, phone hidden; like the unit's watchdog it waits for the brand program to finish before starting the menu); then sends the phone its language (AppCom msg 2, `LANGUAGE` in `launch.c`, default `eng-GBR`), which on the unit comes from navigon |
 | `ceagent.exe` | deploy agent on `COM2:`; receives files, starts and lists programs for `deploy.py` |
-| `pl011poll.dll` | serial-port driver behind `COM2:` and `COM3:` |
+| `pl011poll.dll` | serial-port driver behind `COM1:`, `COM2:` and `COM3:`; on `COM1:` it also copies each received line into the message queue `TX_NMEA`, and it serves `COM4:` from that queue, as the unit's GPS driver and `LoopbackCOM.dll` do ([docs/apps/navit.md](../docs/apps/navit.md) §4) |
 
 After editing `guest/`, `stubs/` or `build.sh`: `rm -rf emulator/work/stage && make emulator`. To use another VIN than the placeholder, add `VIN=<17 characters>` to that `make emulator`.
 
@@ -59,6 +59,7 @@ After editing `guest/`, `stubs/` or `build.sh`: `rm -rf emulator/work/stage && m
 |---|---|---|
 | screen | QEMU window (the 480×272 screen scaled to fit; resize it freely), or VNC `127.0.0.1:5901` (`open vnc://127.0.0.1:5901`) | `emu shot/click/dbl` use it through [vncdotool](https://github.com/sibson/vncdotool) |
 | `COM1:` | TCP 5555 | GPS (simulated by `nmeasim`): `emulator/emu up --gps`, or `.venv/bin/python emulator/gps.py --lat .. --lon .. --speed ..` |
+| `COM4:` | – | the same GPS sentences for a second reader (Navit), like the unit's `COM4:` |
 | `COM2:` | TCP 5556 | deploy agent (`emulator/deploy.py`: `push`, `put`, `get`, `ls`, `rm`, `run`, `ps`) |
 | `COM3:` | TCP 5557 | car link: the unit's car-link program talks here; `emulator/emu up --radio` or `.venv/bin/python emulator/radio.py --rpm .. --speed ..` plays the radio |
 | kernel debug output | `work/serial.log` | `OutputDebugStringW` from any program ends up here |
