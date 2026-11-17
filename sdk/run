@@ -1,0 +1,25 @@
+#!/bin/sh
+# Run a command inside the dev container, with the repo mounted at the same path and the
+# current directory preserved.   sdk/run arm-mingw32ce-gcc --version   |   sdk/run make -C apps/hello
+# Container runtime: Apple `container`, docker or podman (first one found; override with CONTAINER=).
+set -eu
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+IMAGE=4nsf-sdk
+C="${CONTAINER:-}"
+if [ -z "$C" ]; then
+  for c in container docker podman; do command -v "$c" >/dev/null 2>&1 && { C=$c; break; }; done
+fi
+[ -n "$C" ] || { echo "no container runtime found (install Apple container, docker or podman)" >&2; exit 1; }
+
+PLATFORM="--platform linux/amd64"                 # the toolchain image is amd64 only
+if [ "$C" = container ]; then
+  container system status >/dev/null 2>&1 || container system start --enable-kernel-install
+  PLATFORM="$PLATFORM --rosetta"
+fi
+if ! "$C" image inspect "$IMAGE" >/dev/null 2>&1; then
+  echo ">> building the $IMAGE image (first run only, pulls ~1.1 GB)" >&2
+  "$C" build --platform linux/amd64 -t "$IMAGE" -f "$ROOT/sdk/Containerfile" "$ROOT/sdk" >&2
+fi
+# shellcheck disable=SC2086
+TTY=""; [ -t 0 ] && [ -t 1 ] && TTY="-it"
+exec "$C" run --rm $TTY $PLATFORM -v "$ROOT:$ROOT" -w "$PWD" "$IMAGE" "$@"

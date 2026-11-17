@@ -1,0 +1,114 @@
+#!/bin/bash
+# Control the emulator (QEMU on the host, no container).
+#
+#   emulator/emu up [--window] [--gps] [--radio]   boot, start the VW software, wait until it is ready (~2.5 min)
+#   emulator/emu start [--window]                  boot only (Windows CE desktop)
+#   emulator/emu stop | status
+#   emulator/emu shot [NAME]                       screenshot -> emulator/work/shots/NAME.png   (default: screen)
+#   emulator/emu click X Y | dbl X Y               tap / double-tap at a screen position (480x272)
+#
+# --window  show the screen in a QEMU window (default: headless; view with  open vnc://127.0.0.1:5901)
+# --gps     feed a fake GPS fix into the guest's COM1: (emulator/gps.py)
+# --radio   play the car radio on the guest's COM3:, so the car screens show values (emulator/radio.py)
+#
+# Host endpoints while running:
+#   screen: VNC 127.0.0.1:5901 · CPU debugger: gdb remote 127.0.0.1:1234
+#   guest COM1: / COM2: / COM3:  =  TCP 5555 (GPS) / 5556 (deploy agent) / 5557 (car link)
+#   kernel debug output: emulator/work/serial.log
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+WORK="$ROOT/emulator/work"
+PY="$ROOT/.venv/bin/python"
+PID="$WORK/qemu.pid"; GPSPID="$WORK/gps.pid"; RADIOPID="$WORK/radio.pid"
+running() { [ -f "$PID" ] && kill -0 "$(cat "$PID")" 2>/dev/null; }
+vnc()     { "$ROOT/.venv/bin/vncdo" -s 127.0.0.1::5901 "$@"; }       # vncdotool: screen capture and mouse
+shot()    { mkdir -p "$WORK/shots"; vnc capture "$WORK/shots/$1.png"; echo "emulator/work/shots/$1.png"; }
+click()   { vnc move "$1" "$2" click 1; }
+dbl()     { vnc move "$1" "$2" click 1 pause 0.12 click 1; }
+
+start() {
+  local display=(-display none)
+  [ "$window" = 1 ] && case "$(uname)" in Darwin) display=(-display cocoa,zoom-to-fit=on) ;; *) display=(-display gtk,zoom-to-fit=on) ;; esac
+  running && { echo "already running (pid $(cat "$PID"))" >&2; exit 1; }
+  [ -f "$WORK/disk.qcow2" ] || { echo "no disk yet: run 'make setup'" >&2; exit 1; }
+  rm -f "$WORK/serial.log"
+  # Board: ARM Versatile Express A15, 256 MB. The kernel is loaded straight into RAM (no boot loader).
+  # -icount: the guest's clock follows the instructions executed. Left to the host's clock, this
+  # kernel's tick count jumps ahead by whole seconds several times a minute, and time-outs in
+  # the unit's software fire early (the car link restarted every few seconds).
+  nohup qemu-system-arm \
+    -machine type=vexpress-a15,secure=off,virtualization=off -m 256 -icount shift=auto \
+    -device "loader,addr=0x80000000,file=$WORK/kernel/NK.patched.raw" \
+    -device "loader,addr=0x800010c0,cpu-num=0" \
+    -global virtio-mmio.force-legacy=false \
+    -device virtio-tablet-device \
+    -blockdev "driver=file,filename=$WORK/disk.qcow2,node-name=f0" \
+    -blockdev "driver=qcow2,file=f0,node-name=d0" -device virtio-blk-device,drive=d0 \
+    -serial "file:$WORK/serial.log" \
+    -serial tcp:127.0.0.1:5555,server,nowait \
+    -serial tcp:127.0.0.1:5556,server,nowait \
+    -serial tcp:127.0.0.1:5557,server,nowait \
+    -audio none "${display[@]}" -vnc 127.0.0.1:1 -gdb tcp:127.0.0.1:1234 \
+    > "$WORK/qemu.out" 2>&1 &
+  echo $! > "$PID"
+  sleep 2
+  running || { echo "QEMU exited:" >&2; cat "$WORK/qemu.out" >&2; exit 1; }
+}
+
+stop() {
+  for feeder in "$GPSPID" "$RADIOPID"; do
+    [ -f "$feeder" ] && { kill "$(cat "$feeder")" 2>/dev/null || true; }; rm -f "$feeder"
+  done
+  if running; then kill "$(cat "$PID")"; echo "stopped"; else echo "not running"; fi
+  rm -f "$PID"
+}
+
+up() {
+  start
+  echo ">> booting Windows CE (30 s)"; sleep 30
+  # The guest has no autostart hook, so launch.exe is started with the mouse. Explorer icons
+  # at 480x272: My Device -> My Flash Disk -> 0start (first folder) -> launch.exe (first file)
+  dbl 37 25; sleep 3; dbl 188 75; sleep 3; dbl 38 75; sleep 3; dbl 38 75
+  echo ">> starting the VW software"
+  local ok=0
+  for _ in $(seq 1 30); do
+    sleep 5
+    "$PY" "$ROOT/emulator/deploy.py" --timeout 5 ping > /dev/null 2>&1 && { ok=1; break; }
+  done
+  if [ "$ok" = 0 ]; then
+    shot up-failed > /dev/null
+    echo "deploy agent not answering: see emulator/work/shots/up-failed.png and emulator/work/serial.log" >&2; exit 1
+  fi
+  if [ "$gps" = 1 ]; then
+    nohup "$PY" -u "$ROOT/emulator/gps.py" --speed 30 --heading 45 > "$WORK/gps.out" 2>&1 &
+    echo $! > "$GPSPID"
+  fi
+  if [ "$radio" = 1 ]; then
+    nohup "$PY" -u "$ROOT/emulator/radio.py" --rpm 2500 --speed 80 > "$WORK/radio.out" 2>&1 &
+    echo $! > "$RADIOPID"
+  fi
+  # launch.exe says so when the last program (the VW menu) is started; then give the menu time to draw
+  for _ in $(seq 1 30); do
+    grep -aq "LAUNCH: done" "$WORK/serial.log" && break
+    sleep 2
+  done
+  sleep 20
+  echo ">> ready: $(shot up)"
+}
+
+[ -x "$PY" ] || { echo "no Python environment yet: run 'make venv' (or 'make setup')" >&2; exit 1; }
+cmd="${1:-}"; shift || true
+window=0; gps=0; radio=0; args=()
+for a in "$@"; do
+  case "$a" in --window) window=1 ;; --gps) gps=1 ;; --radio) radio=1 ;; --*) echo "unknown option $a" >&2; exit 2 ;; *) args+=("$a") ;; esac
+done
+case "$cmd" in
+  up) up ;;
+  start) start; echo "started (pid $(cat "$PID"))" ;;
+  stop) stop ;;
+  status) if running; then echo "running (pid $(cat "$PID"))"; else echo "stopped"; fi ;;
+  shot) shot "${args[0]:-screen}" ;;
+  click) click "${args[0]}" "${args[1]}" ;;
+  dbl) dbl "${args[0]}" "${args[1]}" ;;
+  *) sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+esac

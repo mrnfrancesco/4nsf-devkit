@@ -1,0 +1,14 @@
+# downloaded / generated
+/firmware/package*
+/firmware/flash/
+/firmware/os/
+/firmware/rom/
+/emulator/work/
+/apps/*/*.exe
+.venv/
+.DS_Store
+__pycache__/
+
+# private notes, never published
+/private/
+CLAUDE.local.md

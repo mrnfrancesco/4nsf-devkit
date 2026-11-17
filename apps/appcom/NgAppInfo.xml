@@ -1,0 +1,24 @@
+<?xml version='1.0' encoding='ISO-8859-1'?>
+<AppCom>
+  <Application Name="AppCom">
+    <Exe>\My Flash Disk\Apps\appcom\appcom.exe</Exe>
+    <WindowName>AppCom4NSF</WindowName>
+    <ClassName>AppCom4NSF</ClassName>
+    <Port>27112</Port>
+    <Group>Settings</Group>
+    <Group>StatusIndicators</Group>
+    <Group>Temperature</Group>
+    <Group>Volume</Group>
+    <Group>Bluetooth</Group>
+    <Group>SpeedInfoCan</Group>
+    <Group>SpeedInfoGps</Group>
+    <Group>PositionInfo</Group>
+    <IsVisible>1</IsVisible>
+    <Autostart>0</Autostart>
+    <IconName>\My Flash Disk\Apps\appcom\appcom.png</IconName>
+    <AppName lc="eng-GBR">AppCom</AppName>
+    <AppName lc="eng-USA">AppCom</AppName>
+    <AppName lc="ger-DEU">AppCom</AppName>
+    <AppName lc="ita-ITA">AppCom</AppName>
+  </Application>
+</AppCom>

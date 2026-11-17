@@ -1,0 +1,16 @@
+<?xml version='1.0' encoding='ISO-8859-1'?>
+<AppCom>
+  <Application Name="Hello">
+    <Exe>\My Flash Disk\Apps\hello\hello.exe</Exe>
+    <WindowName>Hello4NSF</WindowName>
+    <ClassName>Hello4NSF</ClassName>
+    <Port>27111</Port>
+    <IsVisible>1</IsVisible>
+    <Autostart>0</Autostart>
+    <IconName>\My Flash Disk\Apps\hello\hello.png</IconName>
+    <AppName lc="eng-GBR">Hello</AppName>
+    <AppName lc="eng-USA">Hello</AppName>
+    <AppName lc="ger-DEU">Hallo</AppName>
+    <AppName lc="ita-ITA">Ciao</AppName>
+  </Application>
+</AppCom>

@@ -1,0 +1,16 @@
+<?xml version='1.0' encoding='ISO-8859-1'?>
+<AppCom>
+  <Application Name="CarData">
+    <Exe>\My Flash Disk\Apps\cardata\cardata.exe</Exe>
+    <WindowName>CarData4NSF</WindowName>
+    <ClassName>CarData4NSF</ClassName>
+    <Port>27113</Port>
+    <IsVisible>1</IsVisible>
+    <Autostart>0</Autostart>
+    <IconName>\My Flash Disk\Apps\cardata\cardata.png</IconName>
+    <AppName lc="eng-GBR">Car data</AppName>
+    <AppName lc="eng-USA">Car data</AppName>
+    <AppName lc="ger-DEU">Fahrzeugdaten</AppName>
+    <AppName lc="ita-ITA">Dati veicolo</AppName>
+  </Application>
+</AppCom>

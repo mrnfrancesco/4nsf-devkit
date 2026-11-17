@@ -1,0 +1,8 @@
+# Host-side Python tools, installed into .venv by `make venv`.
+# (Tools that run in the dev container get their libraries from sdk/Containerfile.)
+pefile==2024.8.26           # tools/peinfo.py: parse Windows CE programs and DLLs
+vncdotool==1.4.2            # emulator/emu: screenshots and mouse over VNC
+nmeasim==1.1.1.0            # emulator/gps.py: simulated GPS receiver
+crccheck==1.3.1             # tools/decode_frames.py: CRC-16/ARC
+dissect.cstruct==4.6        # tools/nfs_extract.py: binary structures written as C structs
+Pillow==11.3.0              # tools/kbi_extract.py, res_extract.py, rgbfs_extract.py: write PNG images

@@ -1,0 +1,9 @@
+# 4NSF dev container: CeGCC cross-compiler for Windows CE ARM (arm-mingw32ce, GCC 9.3)
+# plus the Linux tools the firmware/emulator build needs. Everything that is not QEMU runs in here.
+FROM ghcr.io/enlyze/windows-ce-build-environment-arm:latest
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        python3 python3-pefile python3-libarchive-c \
+        fdisk dosfstools mtools qemu-utils \
+        curl unzip ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
