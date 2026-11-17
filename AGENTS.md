@@ -22,7 +22,7 @@ Owner-specific notes, if present: `CLAUDE.local.md` (git-ignored).
 ```
 Makefile      setup | venv | firmware | emulator | run | stop | app | deploy | shot | shell | clean
 apps/         user programs; hello/ = template (hello.c, Makefile, NgAppInfo.xml, hello.png) · cardata/ (reads / `set` writes the shared memory) · appcom/ (AppCom listener + sender, bridge for tools/appcom.py) · include/vwshm.h (shared-memory layout, single source)
-sdk/          Containerfile (ENLYZE CeGCC 9.3 + python3, mtools, dosfstools, qemu-img) · run (wrapper)
+sdk/          Containerfile (ENLYZE CeGCC 9.3 + python3, mtools, dosfstools, qemu-img, osmium-tool, maptool) · run (wrapper; MEMORY=8g)
 emulator/     run-time: emu (start/stop/up/shot/click/dbl), deploy.py, gps.py (nmeasim), radio.py (simulated car radio; imports tools/decode_frames.py) · build: build.sh (also compiles guest/ + stubs/), patches/ (patch_kernel, redirect_imports), guest/ (launch, ceagent, pl011poll), stubs/ (cestub, WolfSpecial, ddraw, svoxdll) · work/ (generated)
 firmware/     README.md, fetch.sh, sfx_extract.py (pefile), cerom.py (libarchive); `make firmware` fills package/ flash/ os/ rom/ (git-ignored)
 tools/        hand-run analysis only (usage: tools/README.md): peinfo, decompile (pefile + host r2/r2ghidra, optional) · nfs_extract, kbi_extract, res_extract, rgbfs_extract, hive_dump (dissect.cstruct; PNG via Pillow) · appcom, decode_frames (crccheck), bap_tables · samples/ (dock + AppCom captures)
