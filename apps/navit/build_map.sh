@@ -31,7 +31,10 @@ IN=$SRC
 # 2. crop
 if [ -n "$BBOX" ]; then
   echo ">> crop to $BBOX"
-  osmium extract --bbox "$BBOX" --strategy smart -o "$TMP/crop.osm.pbf" "$IN"
+  # complete borders too: maptool files every town under the country whose border encloses it,
+  # and Navit's address search only finds towns that have a country
+  osmium extract --bbox "$BBOX" --strategy smart -S types=multipolygon,boundary \
+    -o "$TMP/crop.osm.pbf" "$IN"
   IN=$TMP/crop.osm.pbf
 fi
 
