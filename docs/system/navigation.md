@@ -318,7 +318,7 @@ NMEA parser (`CoreConfig.ini`, field names = variables filled):
 - Commands written to the receiver ✅ strings: ST `$PSTMCOLD*1E`, `$PSTMWARM*13`, `$PSTMHOT*49`, `$PSTMWALKINGONOFF,1*18` / `,0*19` (pedestrian mode), `$PSTMSTAGPSSETSEED,…` (assisted-GPS seed from the LIVE "InstantFix" service, answers `…SEEDOK` / `…SEEDERROR`); SiRF `$PSRF101,…` (cold / warm / hot / factory), `$PSRF207`. `GPS/DeviceType` selects the set 🟡.
 - First fix: `FirstGpsFix` flag in user settings; the system clock is set from GPS (`SetSystemTime`, `Time/SetOnFirstGPS`); the fix state is announced with AppCom msg 22 (§8.1).
 
-Navigon keeps `COM2:` open and the port admits one reader ✅; another program can read the same sentences from `COM4:` ([hardware-layer.md](hardware-layer.md) §6.5, [navit.md](../apps/navit.md) §4).
+Navigon keeps `COM2:` open and the port admits one reader ✅; another program can read the same sentences from `COM4:` ([hardware-layer.md](hardware-layer.md) §6.5, [navit.md](../apps/navit.md#the-gps-why-com4)).
 
 ### 3.3 No-GPS supervision ✅ (the logic the emulator defuses)
 
