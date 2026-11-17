@@ -6,12 +6,16 @@
 #   make stop
 #   make app    APP=hello   compile apps/hello          -> apps/hello/hello.exe
 #   make deploy APP=hello   compile, copy into the running emulator as \My Flash Disk\Apps\hello, start it
+#   make map                build a Navit map from OpenStreetMap -> apps/navit/maps/italy.bin
+#                           (MAP=name REGION=geofabrik/path [BBOX=left,bottom,right,top] [FILTER=full]; docs/apps/navit.md)
 #   make shot               screenshot of the emulator   -> emulator/work/shots/screen.png
 #                           (taps: emulator/emu click X Y)
 #   make shell              a shell inside the dev container
 #
 # Pieces of `make setup`, runnable on their own:  make venv | firmware | emulator
 APP ?= hello
+MAP ?= italy
+REGION ?= europe/italy
 SDK := sdk/run
 PY  := .venv/bin/python
 
@@ -41,8 +45,13 @@ app:
 
 # the program first (it is the one started), then what the VW menu needs to list it
 deploy: app
+	@[ ! -x apps/$(APP)/deploy.sh ] || MAPS="$(MAPS)" apps/$(APP)/deploy.sh
 	$(PY) emulator/deploy.py push apps/$(APP)/$(APP).exe $(wildcard apps/$(APP)/NgAppInfo.xml apps/$(APP)/*.png) \
 		'\My Flash Disk\Apps\$(APP)' --run
+
+# a whole country needs more than the container's default memory
+map:
+	MEMORY=$(or $(MEMORY),8g) $(SDK) env FILTER=$(or $(FILTER),roads) apps/navit/build_map.sh $(MAP) $(REGION) $(BBOX)
 
 shot:
 	emulator/emu shot
@@ -55,4 +64,4 @@ clean:
 	rm -rf emulator/work .venv
 	find apps -name '*.exe' -delete
 
-.PHONY: setup venv firmware emulator run stop app deploy shot shell clean
+.PHONY: setup venv firmware emulator run stop app deploy map shot shell clean

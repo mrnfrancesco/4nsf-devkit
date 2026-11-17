@@ -50,6 +50,8 @@ Two more examples show the unit's services:
 - `apps/cardata` reads live vehicle data.
 - `apps/appcom` listens to (and sends) the messages between the unit's programs.
 
+`apps/navit` adds [Navit](https://github.com/navit-gps/navit), an open-source navigation program, with OpenStreetMap maps you build yourself (`make map`); the unit's own navigation keeps running. Guide: [docs/apps/navit.md](docs/apps/navit.md).
+
 Full guide: [docs/apps/building-apps.md](docs/apps/building-apps.md).
 
 ## Status
@@ -70,7 +72,7 @@ Full guide: [docs/apps/building-apps.md](docs/apps/building-apps.md).
 
 | Folder | Contents |
 |---|---|
-| `apps/` | Your programs. `hello/` is the template: source, `NgAppInfo.xml` (the entry in the VW menu) and icon. `cardata/` and `appcom/` are examples for vehicle data and for messages between programs; `include/` has the header they share. |
+| `apps/` | Your programs. `hello/` is the template: source, `NgAppInfo.xml` (the entry in the VW menu) and icon. `cardata/` and `appcom/` are examples for vehicle data and for messages between programs; `navit/` adds the Navit navigation program with OpenStreetMap maps; `include/` has the header they share. |
 | `sdk/` | The dev container: CeGCC cross-compiler plus the tools the build scripts need. `sdk/run <command>` runs anything inside it. |
 | `emulator/` | The test bench (QEMU): build it, start it, copy programs into it, feed it a GPS position and a simulated car. Start with [emulator/README.md](emulator/README.md). |
 | `firmware/` | The scripts that download and unpack the official software (`make firmware`). The software itself is not part of the repository. See [firmware/README.md](firmware/README.md). |
@@ -111,6 +113,7 @@ Start with **[docs/architecture.md](docs/architecture.md)**: the whole system on
 |---|---|
 | [building-apps.md](docs/apps/building-apps.md) | Compiling, running in the emulator, installing on a real unit, using the unit's services and DLLs |
 | [appcom.md](docs/apps/appcom.md) | The message system between the unit's programs (UDP on localhost): wire format and message catalogue |
+| [navit.md](docs/apps/navit.md) | Navit with OpenStreetMap maps as an app: building maps, GPS next to the stock navigation, installing |
 
 ## Related projects
 

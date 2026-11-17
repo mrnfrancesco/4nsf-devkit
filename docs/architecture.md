@@ -286,6 +286,7 @@ Needs more static analysis:
 | **`apps/` — writing programs for the unit** | |
 | [apps/appcom.md](apps/appcom.md) | app-to-app messages: wire format, registry, message catalogue, API |
 | [apps/building-apps.md](apps/building-apps.md) | writing, building and installing an app; using the unit's services |
+| [apps/navit.md](apps/navit.md) | Navit (open-source navigation) with OpenStreetMap maps as an app: maps, GPS through `COM4:`, install |
 | `img/` | pictures used by the documents (dock pinout photo, emulator screenshots incl. three with data from the simulated radio) |
 
 Tools to check or redo the analysis (`../tools/`, usage in [tools/README.md](../tools/README.md)): `peinfo.py`, `decompile.py` (programs) · `nfs_extract.py`, `kbi_extract.py`, `res_extract.py`, `rgbfs_extract.py`, `hive_dump.py` (files; all read-only) · `appcom.py`, `decode_frames.py`, `bap_tables.py` (messages and car link).

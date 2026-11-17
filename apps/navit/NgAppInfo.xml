@@ -1,0 +1,18 @@
+<?xml version='1.0' encoding='ISO-8859-1'?>
+<AppCom>
+  <!-- Exe = the launcher (map picker). ClassName / WindowName = Navit's own window, so a tap on
+       the menu entry while Navit runs brings it to the front instead of starting it again. -->
+  <Application Name="Navit">
+    <Exe>\My Flash Disk\Apps\navit\navit.exe</Exe>
+    <WindowName>Navit</WindowName>
+    <ClassName>NAVGRA</ClassName>
+    <Port>27114</Port>
+    <IsVisible>1</IsVisible>
+    <Autostart>0</Autostart>
+    <IconName>\My Flash Disk\Apps\navit\navit.png</IconName>
+    <AppName lc="eng-GBR">Navit</AppName>
+    <AppName lc="eng-USA">Navit</AppName>
+    <AppName lc="ger-DEU">Navit</AppName>
+    <AppName lc="ita-ITA">Navit</AppName>
+  </Application>
+</AppCom>

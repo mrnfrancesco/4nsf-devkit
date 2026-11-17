@@ -22,6 +22,7 @@ The apps in `apps/`:
 | `hello` | the template: a window, the command line the menu passes, tap to exit |
 | `cardata` | live vehicle data read from the unit's shared memory (below: "Using the unit's services"); `cardata.exe set …` writes it |
 | `appcom` | the messages the unit's programs send each other: records them for `tools/appcom.py`, sends hand-made ones |
+| `navit` | a launcher that picks OpenStreetMap maps and starts Navit, an open-source navigation program ([navit.md](navit.md)) |
 
 `apps/include/` holds headers for the unit's services, shared by the apps (`-I../include` in the app's `Makefile`): `vwshm.h`, the layout of the vehicle data.
 
@@ -44,7 +45,7 @@ How the VW menu uses `NgAppInfo.xml` (✅ seen in the emulator, which runs the u
 - It reads `\My Flash Disk\Apps\*\NgAppInfo.xml` **once, when it starts**, and lists every app with `<IsVisible>1` under **more**. A newly deployed app shows up there after the next `make stop` / `make run`.
 - When the entry is tapped, the menu looks for a window with the class `<ClassName>` and title `<WindowName>`. If there is one, it comes to the front. If not, the menu starts `<Exe>` with the arguments ` language=eng-GBR skin=VW` (its current language, and the brand: `VW`, `Seat` or `Skoda`; the program receives exactly this string, leading blank included, as its command line). A program may ignore them.
 - So the class and title in the XML must be the ones your program gives its main window; otherwise every tap starts another copy.
-- `<Port>` is the app's address for messages from other apps (UDP on 127.0.0.1). It must be unique: 27011–27021 and 27103–27110 are taken by the unit, 27111–27113 by the apps here. A program that never listens on it is still listed and started.
+- `<Port>` is the app's address for messages from other apps (UDP on 127.0.0.1). It must be unique: 27011–27021 and 27103–27110 are taken by the unit, 27111–27114 by the apps here. A program that never listens on it is still listed and started.
 - Only the **first** `<Application>` of each `NgAppInfo.xml` is read, one file per folder.
 
 ```xml
