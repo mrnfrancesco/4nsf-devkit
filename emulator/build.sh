@@ -29,7 +29,7 @@ if [ ! -f "$STAGE/.done" ]; then
   echo ">> 2. compile our programs for the guest (guest/) and the stand-in DLLs (stubs/)"
   CC="arm-mingw32ce-gcc -O2 -Wall -s -static -D_WIN32_WCE=0x600 -DUNICODE -D_UNICODE"
   mkdir -p "$WORK/guest" "$WORK/stubs"
-  $CC -Wl,--image-base,0x10000 -o "$WORK/guest/launch.exe"  "$EMU/guest/launch.c"
+  $CC -Wl,--image-base,0x10000 -o "$WORK/guest/launch.exe"  "$EMU/guest/launch.c" -lws2
   $CC -Wl,--image-base,0x10000 -o "$WORK/guest/ceagent.exe" "$EMU/guest/ceagent.c" -ltoolhelp
   $CC -shared -o "$WORK/guest/pl011poll.dll" "$EMU/guest/pl011poll.c"
   for source in "$EMU"/stubs/*.c; do       # VIN=<17 characters> replaces the placeholder in WolfSpecial.c

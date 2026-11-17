@@ -433,6 +433,8 @@ Device name: set by the phone app with `SetLocalDeviceName` (module cmd 0x16); d
 
 3.2 MB, MN7 GUI framework (same as `navigon.exe`, see [ui-framework.md](ui-framework.md)), resources in `PhoneApplication.res` (+ `skin_SEAT/`, `skin_SKODA/`), texts in `language_files/*.lng`. AppCom name `Bluetooth`, port 27015, window/class `PhoneApplication`. Started by the watchdog with `-TSW_HIDE` (start hidden; the shell brings it to front with `StartApplication("Bluetooth")`, [user-shell.md](user-shell.md)).
 
+Language: no setting of its own (`UserSettingsLanguage.default` is empty, nothing written to `\MN Settings\BT\`). At start it loads `language_files/ger-DEU_480_272.lng` (hard-coded, `0x74d28`) and switches when AppCom msg 2 `[2, "<locale>"]` arrives ✅ emulator; on the unit navigon sends it (and msg 10 `[8, "<locale>"]`, [appcom.md](../apps/appcom.md) §9). Without navigon the phone stays German ✅ emulator → the emulator's `launch.exe` sends msg 2 in navigon's place.
+
 ### 8.1 Internal structure ✅ (class names from log strings)
 
 | Class | Job |

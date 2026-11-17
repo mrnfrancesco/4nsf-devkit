@@ -47,7 +47,7 @@ The programs in `guest/`:
 
 | Program | Role |
 |---|---|
-| `launch.exe` | what `emu up` double-clicks: hides the taskbar, adds `COM2:`/`COM3:`, starts the agent and the three VW processes (car link, brand program, menu; like the unit's watchdog it waits for the brand program to finish before starting the menu) |
+| `launch.exe` | what `emu up` double-clicks: hides the taskbar, adds `COM2:`/`COM3:`, starts the agent and the VW processes (car link, brand program, menu, phone hidden; like the unit's watchdog it waits for the brand program to finish before starting the menu); then sends the phone its language (AppCom msg 2, `LANGUAGE` in `launch.c`, default `eng-GBR`), which on the unit comes from navigon |
 | `ceagent.exe` | deploy agent on `COM2:`; receives files, starts and lists programs for `deploy.py` |
 | `pl011poll.dll` | serial-port driver behind `COM2:` and `COM3:` |
 

@@ -7,16 +7,25 @@
  *  1. hide the Explorer taskbar: it covers the bottom 26 px, where the VW apps draw buttons
  *  2. add the serial ports COM2: and COM3: (the Windows image only knows COM1:)
  *  3. start the deploy agent on COM2: (host side: emulator/deploy.py)
- *  4. start the three VW processes with the command lines from the unit's Watchdog_*.ini;
+ *  4. start the VW processes with the command lines from the unit's Watchdog_*.ini;
  *     like the watchdog, wait for the brand app to finish before starting the menu
+ *  5. tell the phone program the language. It starts with built-in ger-DEU texts and waits for
+ *     navigon.exe to send the unit's language (AppCom message 2, setting 2). navigon.exe is not
+ *     started here, so this program sends that message in its place (as navigon's port 27011).
  *
  * Progress goes to the kernel debug output (emulator/work/serial.log on the host).
  */
+#include <winsock2.h>
 #include <windows.h>
 
 #define FLASH  L"\\My Flash Disk\\"
 #define DEV    FLASH L"dev\\"
 #define DRIVER L"pl011poll.dll"
+
+/* Same locale as the menu's default (VwUserShell Settings: LanguageLocale) = a .lng file name. */
+#define LANGUAGE "eng-GBR"
+#define WIDE_(text) L##text
+#define WIDE(text) WIDE_(text)
 
 static void log_line(const wchar_t *format, ...)
 {
@@ -92,6 +101,63 @@ static void start(const wchar_t *program, const wchar_t *arguments, DWORD finish
     Sleep(1500);        /* the VW processes expect each other to be up, in this order */
 }
 
+static BYTE *put32(BYTE *at, DWORD value)
+{
+    memcpy(at, &value, 4);
+    return at + 4;
+}
+
+/*
+ * Send AppCom message 2 [2, LANGUAGE] ("setting 2 = language changed") to the phone, port 27015.
+ * Wire format: docs/apps/appcom.md §3-4; same bytes as
+ *   tools/appcom.py encode 27011 2 '[2, "eng-GBR"]'
+ */
+static void send_language(void)
+{
+    BYTE datagram[64], *at = datagram;
+    DWORD length = sizeof LANGUAGE - 1;
+    struct sockaddr_in address = { 0 };
+    WSADATA winsock;
+    SOCKET udp;
+    int sent = -1;
+
+    at = put32(at, 0);                          /* header: bytes still to come in later datagrams */
+    at = put32(at, 27011);                      /* header: sender port (navigon) */
+    at = put32(at, 4); at = put32(at, 2);       /* List of 2 */
+    at = put32(at, 8); at = put32(at, 2);       /*   Int 2 = message id */
+    at = put32(at, 4); at = put32(at, 2);       /*   List of 2 */
+    at = put32(at, 8); at = put32(at, 2);       /*     Int 2 = setting "language" */
+    at = put32(at, 6); at = put32(at, length);  /*     Binary = locale, UTF-8, padded to 4 */
+    memset(at, 0, (length + 3) & ~3);
+    memcpy(at, LANGUAGE, length);
+    at += (length + 3) & ~3;
+
+    address.sin_family = AF_INET;
+    address.sin_port = htons(27015);
+    address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    WSAStartup(MAKEWORD(2, 2), &winsock);
+    udp = socket(AF_INET, SOCK_DGRAM, 0);
+    if (udp != INVALID_SOCKET) {
+        sent = sendto(udp, (char *)datagram, at - datagram, 0, (struct sockaddr *)&address, sizeof address);
+        closesocket(udp);
+    }
+    WSACleanup();
+    log_line(L"LAUNCH: phone language " WIDE(LANGUAGE) L" -> %s", sent == at - datagram ? L"sent" : L"FAILED");
+}
+
+/* Waits up to `timeout_ms` for a top-level window of that class and title. */
+static BOOL wait_window(const wchar_t *class_name, const wchar_t *title, DWORD timeout_ms)
+{
+    DWORD start = GetTickCount();
+
+    while (!FindWindowW(class_name, title)) {
+        if (GetTickCount() - start > timeout_ms)
+            return FALSE;
+        Sleep(500);
+    }
+    return TRUE;
+}
+
 int WINAPI WinMain(HINSTANCE instance, HINSTANCE previous, LPWSTR command_line, int show)
 {
     HWND taskbar = FindWindowW(L"HHTaskBar", NULL);
@@ -106,6 +172,12 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE previous, LPWSTR command_line, 
      * (Unpaired, it would wait for a car for ever; the watchdog then never starts the menu.) */
     start(FLASH L"VwBrandDevice\\VwBrandDevice.exe", L"", 60000);
     start(FLASH L"VwUserShell\\VwUserShell.exe", L"-ShowWindow=1", 0);
+    start(FLASH L"BT\\PhoneApplication.exe", L"-TSW_HIDE", 0);
+    if (wait_window(L"PhoneApplication", L"PhoneApplication", 60000)) {
+        Sleep(3000);    /* window first, AppCom listener a moment later */
+        send_language();
+    } else
+        log_line(L"LAUNCH: no phone window after 60 s, language not sent");
     log_line(L"LAUNCH: done");
     return 0;
 }
