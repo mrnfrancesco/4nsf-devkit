@@ -116,7 +116,7 @@ When you tap **Start Navit**, the launcher writes `maps.xml`, starts Navit, wait
 | GPS from `COM4:` | `COM2:`, where the GPS normally is, belongs to the unit's navigation (next section) |
 | maps and map styles loaded by full path | on Windows CE, Navit does not expand its path variables or wildcards (hupog found this first) |
 | first position: Rome | Navit later remembers the last position in `data\center.txt`; delete that file to go back |
-| full screen, larger text, icons and buttons | 480×272 touch screen, operated with a finger |
+| full screen, larger text, icons and buttons; Navit's second, small pair of zoom buttons switched off | 480×272 touch screen, operated with a finger |
 | flat map, no automatic tilt | faster drawing |
 
 Navit always reads `navit.xml` from its own folder.

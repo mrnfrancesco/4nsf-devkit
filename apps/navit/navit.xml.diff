@@ -1,7 +1,7 @@
 Changes to Navit 0.5.7's navit.xml for the 4NSF unit, applied by apps/navit/fetch.sh.
-Italy-centred start, full screen, bigger touch targets, flat map, GPS from COM4: (the unit's
-NMEA copy, see docs/apps/navit.md), maps from maps.xml (written by the launcher), layouts
-with absolute paths. navit.xml is part of Navit (GPL-2.0).
+Italy-centred start, full screen, bigger touch targets (and no duplicate small zoom buttons),
+flat map, GPS from COM4: (the unit's NMEA copy, see docs/apps/navit.md), maps from maps.xml
+(written by the launcher), layouts with absolute paths. navit.xml is part of Navit (GPL-2.0).
 
 --- a/navit.xml
 +++ b/navit.xml
@@ -42,7 +42,16 @@ with absolute paths. navit.xml is part of Navit (GPL-2.0).
          <osd enabled="no" type="compass"/>
  		<osd enabled="no" type="navigation_next_turn"/>
  
-@@ -218,7 +218,7 @@
+@@ -211,14 +211,14 @@
+ 			It's always the top left corner of the icon, so you need to consider the icon's size when you enter the values. -->
+ 		<osd enabled="no" type="button" x="0" y="0" command="gui.fullscreen=!gui.fullscreen" src="toggle_fullscreen.png"/>
+ 		<osd enabled="no" type="button" x="-96" y="0" command="gui.menu(1)" src="menu.png"/>
+-		<osd enabled="yes" type="button" x="-96" y="-96" command="zoom_in()" src="zoom_in.png"/>
+-		<osd enabled="yes" type="button" x="0" y="-96" command="zoom_out()" src="zoom_out.png"/>
++		<osd enabled="no" type="button" x="-96" y="-96" command="zoom_in()" src="zoom_in.png"/>
++		<osd enabled="no" type="button" x="0" y="-96" command="zoom_out()" src="zoom_out.png"/>
+ 
+ 		<!-- Traffic -->
  		<traffic type="null"/>
  
  		<!-- Vehicle with GPS enabled for gpsd on unix -->
