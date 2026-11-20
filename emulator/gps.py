@@ -12,7 +12,6 @@ when the emulator connects; at the last point the car stops. A GPX of a real roa
 Navit drive one with its demo vehicle and log it (docs/apps/navit.md, "Emulator details").
 """
 import argparse
-import math
 import socket
 import threading
 import time
@@ -36,12 +35,8 @@ def load_track(path):
 
 
 def bearing(a, b):
-    """Initial course from a to b, degrees from north."""
-    lat1, lat2 = math.radians(a[0]), math.radians(b[0])
-    dlon = math.radians(b[1] - a[1])
-    y = math.sin(dlon) * math.cos(lat2)
-    x = math.cos(lat1) * math.sin(lat2) - math.sin(lat1) * math.cos(lat2) * math.cos(dlon)
-    return math.degrees(math.atan2(y, x)) % 360
+    """Course from a to b, degrees from north."""
+    return gpxpy.geo.get_course(a[0], a[1], b[0], b[1]) % 360
 
 
 def follow(simulator, points, kph):
