@@ -20,7 +20,7 @@ make stop && make run GPS=1           # the VW menu looks for new apps only when
 
 Then tap **more → Navit**, tick the maps, and tap **Start Navit**.
 
-Be patient: in the emulator Navit takes 2–3 minutes to appear, because QEMU has to emulate every instruction of the CPU (inside the emulated unit it is about 7 seconds). The map is drawn at the first touch. The simulated GPS starts in Wolfsburg; to drive around Rome instead, restart it with `.venv/bin/python emulator/gps.py --lat 41.9028 --lon 12.4964 --speed 30`.
+Be patient: in the emulator Navit takes 2–3 minutes to appear, because QEMU has to emulate every instruction of the CPU (inside the emulated unit it is about 7 seconds). The simulated GPS starts in Wolfsburg; to drive around Rome instead, restart it with `.venv/bin/python emulator/gps.py --lat 41.9028 --lon 12.4964 --speed 30`.
 
 ## Using it
 
