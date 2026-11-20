@@ -13,6 +13,9 @@ PY=.venv/bin/python
 NAVIT='\My Flash Disk\Navit'
 N=apps/navit/navit
 
+$PY emulator/deploy.py mkdir "$NAVIT" 2>/dev/null || true      # push creates one folder level only
+$PY emulator/deploy.py mkdir "$NAVIT\\maps" 2>/dev/null || true
+
 # navit.exe last: once it is there, the copy is complete; again whenever its size changed
 remote=$($PY emulator/deploy.py ls "$NAVIT" 2>/dev/null || true)
 if ! echo "$remote" | grep -q ' navit\.exe$'; then
