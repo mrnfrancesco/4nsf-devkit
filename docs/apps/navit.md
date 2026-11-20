@@ -20,7 +20,7 @@ make stop && make run GPS=1           # the VW menu looks for new apps only when
 
 Then tap **more → Navit**, tick the maps, and tap **Start Navit**.
 
-Be patient: in the emulator Navit takes 2–3 minutes to appear, because QEMU has to emulate every instruction of the CPU (inside the emulated unit it is about 7 seconds). The simulated GPS starts in Wolfsburg; to drive around Rome instead, restart it with `.venv/bin/python emulator/gps.py --lat 41.9028 --lon 12.4964 --speed 30`.
+In the emulator Navit's window appears a few seconds after **Start Navit**, the map soon after. The simulated GPS starts in Wolfsburg; to drive around Rome instead, restart it with `.venv/bin/python emulator/gps.py --lat 41.9028 --lon 12.4964 --speed 30`.
 
 ## Using it
 
@@ -59,7 +59,7 @@ Where to put the maps:
 - **SD card** for large maps: `\Storage Card\Navit\maps\`. The flash disk is nearly full: the update package alone puts 3.5 GB on it ✅, most of it the stock maps (2.9 GB). Italy, for example, gives a 510 MB map.
 - **Flash disk** for a city or a small region: `\My Flash Disk\Navit\maps\`.
 - **Not larger than 2 GB** per file: this Navit build cannot read bigger ones. Split a big country into regions and tick them all.
-- **In the emulator**, use small maps. `make deploy` copies them over an emulated serial line at about 60 KB/s (Rome takes 2 minutes), and the emulated disk is as full as the real one.
+- **In the emulator**, `make deploy … MAPS=` copies maps over an emulated serial line at about 60 KB/s (Rome: 2 minutes). For big maps stop the emulator and copy them straight into its disk: `make stop && make emulator MAPS="italy" && make run` (seconds; [emulator/README.md](../../emulator/README.md) step 9).
 
 Map data © OpenStreetMap contributors, under the [ODbL](https://opendatacommons.org/licenses/odbl/). Navit does not show this on screen: if you share maps, say where the data comes from.
 
@@ -94,8 +94,8 @@ Application10 = \My Flash Disk\Apps\navit\navit.exe
 ### On a real unit
 
 - **Tried** ✅ unit (2026-11-20, one drive, a city map of Rome from the SD card): see Status at the top. The two `[NoResetAfterException]` lines were in place, but Navit never crashed, so they were not put to the test.
-- **Memory** ❓: Navit runs alongside the navigation, the menu, the phone and the media player. Fine with a city map; with a region or a whole country not tried. hupog, who ran Navit *instead of* the navigation, only reported slow drawing with big maps. Start with a region rather than a whole country.
-- **Speed**: fine with a city map and `FILTER=roads` ✅ unit; larger maps not tried.
+- **Memory**: Navit reads its map files as it needs them instead of loading them. ✅ emulator (256 MB machine, 115 MB of it for programs; menu, phone and car link running): free RAM 94 MB before Navit, 81 MB with Navit and the whole of Italy (486 MB map), unchanged after two minutes; 93 MB again after Quit. On the unit the stock navigation runs as well and takes its share ❓; city map ✅ unit. Measure with `.venv/bin/python emulator/deploy.py mem` before and after starting Navit.
+- **Speed**: fine with a city map and `FILTER=roads` ✅ unit. All of Italy: window after about 3 s, map drawn, ✅ emulator; on the unit ❓.
 - **Speech on the car's speakers** ❓: whether the radio switches to the unit in time for the first word (`CLAIM_LEAD` in `navitsnd.c`, 300 ms) and lowers its own programme.
 - **What Navit does not do here**: traffic messages, car data.
 

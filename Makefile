@@ -32,7 +32,7 @@ firmware:
 	$(SDK) firmware/fetch.sh
 
 emulator:
-	$(SDK) env $(if $(VIN),VIN=$(VIN)) emulator/build.sh
+	$(SDK) env $(if $(VIN),VIN=$(VIN)) $(if $(MAPS),MAPS="$(MAPS)") emulator/build.sh
 
 run:
 	emulator/emu up $(if $(HEADLESS),,--window) $(if $(GPS),--gps) $(if $(RADIO),--radio)

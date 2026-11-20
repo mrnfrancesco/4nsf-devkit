@@ -20,7 +20,7 @@ QEMU has no model of the unit's processor board (STMicroelectronics Cartesio+), 
 |---|---|---|
 | Machine | `qemu-system-arm`, board `vexpress-a15`, 256 MB | stock QEMU, started by `emulator/emu` with `-icount` (see "The clock" below) |
 | Kernel | Windows Embedded Compact 7 image prebuilt by [Milek7/wince-qemu](https://github.com/Milek7/wince-qemu) | downloaded by `build.sh`, SHA-256 pinned |
-| Disk | 4 GB FAT32 image mounted as `\My Flash Disk` | a copy of `firmware/flash/` with the changes below |
+| Disk | 6 GB FAT32 image mounted as `\My Flash Disk` (the unit's flash is 4 GB; the rest is room for big Navit maps) | a copy of `firmware/flash/` with the changes below |
 | Unit-specific system DLLs | the unit's own system image (`firmware/rom/`) | copied next to each program instead of living in `\Windows` |
 
 What `build.sh` does, step by step:
@@ -32,7 +32,8 @@ What `build.sh` does, step by step:
 5. **System DLLs next to every program**: our stand-ins from `stubs/`, then the unit's own DLLs and fonts from `firmware/rom/files/` (on the unit they live in `\Windows`).
 6. **Settings**: GPS on `COM1:`, the car link on `COM3:` (the unit uses `COM9:`), Navigon's software map renderer, the no-GPS restart timer raised, the boot animation disabled (it crashes without the unit's graphics accelerator). Pairing needs no setting: the stand-in's hidden flash says "paired with a Volkswagen", and there is no `BrandDevice.reg` file, which would send the brand program back to waiting for a car.
 7. **Guest programs** from `guest/`, copied to `\My Flash Disk\0start` and `\My Flash Disk\dev`.
-8. **Disk**: one 4 GB FAT32 partition (`sfdisk`, `mkfs.vfat`, `mcopy`), plus a qcow2 overlay.
+8. **Disk**: one 6 GB FAT32 partition (`sfdisk`, `mkfs.vfat`, `mcopy`), plus a qcow2 overlay that takes the guest's writes.
+9. **Maps** (only with `MAPS="italy roma"`, emulator stopped): Navit maps from `apps/navit/maps/` straight into `\My Flash Disk\Navit\maps`, in seconds instead of hours through the agent. The overlay is first folded into the disk (`qemu-img commit`), so deployed apps and settings stay. mtools stores names that fit 8.3 in capitals (`ITALY.BIN`). A second disk as SD card does not work: this kernel's disk driver serves only one.
 
 The stand-ins in `stubs/` (plain C):
 
