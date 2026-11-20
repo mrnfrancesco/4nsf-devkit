@@ -1,8 +1,8 @@
 #!/bin/sh
 # Build a Navit map (binfile) from an OpenStreetMap extract. Runs inside the dev container:
 #
-#   make map NAME=italy REGION=europe/italy                      whole country
-#   make map NAME=milano REGION=europe/italy/nord-ovest BBOX=8.9,45.3,9.4,45.6
+#   make map MAP=italy REGION=europe/italy                       whole country
+#   make map MAP=milano REGION=europe/italy/nord-ovest BBOX=8.9,45.3,9.4,45.6
 #
 #   REGION  path of an extract on download.geofabrik.de (without -latest.osm.pbf)
 #   BBOX    optional crop: left,bottom,right,top in degrees
@@ -29,15 +29,24 @@ if [ -f "$SRC" ]; then
 else
   curl -fL --progress-bar -o "$SRC.part" "$URL"
 fi
-[ ! -s "$SRC.part" ] || mv "$SRC.part" "$SRC"
-rm -f "$SRC.part"
-# check the published MD5; Geofabrik sometimes publishes none: then read the whole file instead
-if MD5=$(curl -fsSL "$URL.md5"); then
-  echo "$MD5" | awk -v f="$SRC" '{print $1 "  " f}' | md5sum -c --quiet
-else
-  echo ">> no MD5 published, checking the whole file"
-  osmium fileinfo -e "$SRC" >/dev/null
+# a new download replaces the kept extract only once it checks out: the published MD5, or, when
+# Geofabrik publishes none, a full read. A bad one is deleted, so the next run downloads it again.
+if [ -s "$SRC.part" ]; then
+  if MD5=$(curl -fsSL "$URL.md5"); then
+    echo "$MD5" | awk -v f="$SRC.part" '{print $1 "  " f}' | md5sum -c --quiet || CORRUPT=1
+  else
+    echo ">> no MD5 published, checking the whole file"
+    osmium fileinfo -e "$SRC.part" >/dev/null || CORRUPT=1
+  fi
+  if [ -n "${CORRUPT:-}" ]; then
+    rm -f "$SRC.part"
+    echo "the download is damaged; run make map again (the previous extract, if any, is kept)" >&2
+    exit 1
+  fi
+  mv "$SRC.part" "$SRC"
 fi
+rm -f "$SRC.part"
+[ -f "$SRC" ] || { echo "no extract for $REGION" >&2; exit 1; }
 
 TMP=$(mktemp -d "$MAPS/.build-XXXXXX")
 trap 'rm -rf "$TMP"' EXIT
