@@ -24,6 +24,7 @@ The findings these files encode (hidden-flash layout, board API signatures, kern
 ## Other third-party content in the repository
 
 - `apps/navit/navit.xml.diff`: changes to `navit.xml` of [Navit](https://github.com/navit-gps/navit) 0.5.7; like that file, GPL-2.0.
+- `apps/navit/navit.c`: the table of ISO 3166 country codes (three and two letters) comes from Navit's `country.c`; the codes themselves are an international standard.
 - `emulator/tracks/roma-nomentana.gpx`: a road in Rome taken from OpenStreetMap (© OpenStreetMap contributors, ODbL 1.0), test drive for `emulator/gps.py --track`.
 - `tools/samples/dock-capture.txt`: 53 serial frames posted by "robomrburns" on seatcupra.net (2016, thread "Garmin PID / Garmin mod skin tool / reverse engineering"). Included as test data; not covered by this project's licences.
 
