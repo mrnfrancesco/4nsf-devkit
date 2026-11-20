@@ -47,7 +47,7 @@ The programs in `guest/`:
 
 | Program | Role |
 |---|---|
-| `launch.exe` | what `emu up` double-clicks: hides the taskbar, adds `COM2:`/`COM3:`, takes over `COM1:` and adds `COM4:` (the GPS copy, below), starts the agent and the VW processes (car link, brand program, menu, phone hidden; like the unit's watchdog it waits for the brand program to finish before starting the menu); then sends the phone its language (AppCom msg 2, `LANGUAGE` in `launch.c`, default `eng-GBR`), which on the unit comes from navigon |
+| `launch.exe` | what `emu up` double-clicks: hides the taskbar, adds `COM2:`/`COM3:`, takes over `COM1:` and adds `COM4:` (the GPS copy, below), turns console output off like the unit's registry does (`HKLM\Drivers\Console\OutputTo = -1`: no text windows from programs that print), starts the agent and the VW processes (car link, brand program, menu, phone hidden; like the unit's watchdog it waits for the brand program to finish before starting the menu); then sends the phone its language (AppCom msg 2, `LANGUAGE` in `launch.c`, default `eng-GBR`), which on the unit comes from navigon |
 | `ceagent.exe` | deploy agent on `COM2:`; receives files, starts and lists programs for `deploy.py` |
 | `pl011poll.dll` | serial-port driver behind `COM1:`, `COM2:` and `COM3:`; on `COM1:` it also copies each received line into the message queue `TX_NMEA`, and it serves `COM4:` from that queue, as the unit's GPS driver and `LoopbackCOM.dll` do ([docs/apps/navit.md](../docs/apps/navit.md#the-gps-why-com4)). The unit's own `LoopbackCOM.dll` is not used: the copy extracted from the ROM does not load (error 193) |
 

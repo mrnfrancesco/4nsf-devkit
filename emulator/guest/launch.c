@@ -10,7 +10,9 @@
  *  3. start the deploy agent on COM2: (host side: emulator/deploy.py)
  *  4. start the VW processes with the command lines from the unit's Watchdog_*.ini;
  *     like the watchdog, wait for the brand app to finish before starting the menu
- *  5. tell the phone program the language. It starts with built-in ger-DEU texts and waits for
+ *  5. turn console output off, as on the unit (HKLM\Drivers\Console\OutputTo = -1, in the unit's
+ *     ROM registry): programs that print (Navit) would otherwise open text windows here
+ *  6. tell the phone program the language. It starts with built-in ger-DEU texts and waits for
  *     navigon.exe to send the unit's language (AppCom message 2, setting 2). navigon.exe is not
  *     started here, so this program sends that message in its place (as navigon's port 27011).
  *
@@ -207,6 +209,18 @@ static BOOL wait_window(const wchar_t *class_name, const wchar_t *title, DWORD t
     return TRUE;
 }
 
+static void no_console_windows(void)
+{
+    HKEY console;
+
+    if (RegCreateKeyExW(HKEY_LOCAL_MACHINE, L"Drivers\\Console", 0, NULL, 0, 0, NULL, &console, NULL) != ERROR_SUCCESS) {
+        log_line(L"LAUNCH: cannot turn console output off");
+        return;
+    }
+    set_dword(console, L"OutputTo", 0xFFFFFFFF);
+    RegCloseKey(console);
+}
+
 int WINAPI WinMain(HINSTANCE instance, HINSTANCE previous, LPWSTR command_line, int show)
 {
     HWND taskbar = FindWindowW(L"HHTaskBar", NULL);
@@ -215,6 +229,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE previous, LPWSTR command_line, 
         ShowWindow(taskbar, SW_HIDE);
 
     add_serial_ports();
+    no_console_windows();
     start(DEV L"ceagent.exe", L"COM2:", 0);
     start(FLASH L"VwUserShell\\VwCommunicationExe.exe", L"", 0);
     /* On a paired unit the brand app installs the boot pictures and exits within seconds.

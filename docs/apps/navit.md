@@ -170,7 +170,7 @@ The launcher's window-watching and this DLL use the same AppCom port, 27114 (`<P
 
 ### Emulator details
 
-- Navit opens text windows for its console output; in the emulator they sit behind it and show up on the Windows taskbar while Navit closes. The unit's settings turn console output off (`HKLM\Drivers\Console\OutputTo = -1` ✅), so they should not appear there 🟡.
+- Navit prints to a console; the unit's settings send console output nowhere (`HKLM\Drivers\Console\OutputTo = -1` ✅), and the emulator's `launch.exe` sets the same, so no text windows appear ✅ emulator.
 - Navit shows the Windows taskbar when it exits; the launcher hides it again. The unit has no taskbar.
 - `navitsnd.dll` writes `NAVITSND: claim` / `NAVITSND: release` to `emulator/work/serial.log`. The emulator has a sound device, so the speech runs, but nothing is heard.
 - The launcher writes `NAVIT: window after … ms`, `NAVIT: menu overlay state N` and `NAVIT: overlay ended, Navit back to the front` to `emulator/work/serial.log`; to see an overlay, open a door with the simulated radio (`emulator/radio.py --doors 01`, after one AppCom message 40, [building-apps.md](building-apps.md)); Navit's own log is `\My Flash Disk\Navit\navit.log` (fetch it with `.venv/bin/python emulator/deploy.py get`).
