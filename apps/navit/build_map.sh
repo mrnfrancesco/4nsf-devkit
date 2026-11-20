@@ -8,7 +8,8 @@
 #   BBOX    optional crop: left,bottom,right,top in degrees
 #   FILTER  roads (default): roads, ferries, turn restrictions, places, water, borders.
 #           Everything else (buildings, POIs, land use) is dropped: the unit draws a smaller
-#           map much faster. full: keep everything.
+#           map much faster. addresses: the same plus house numbers (for the address search).
+#           full: keep everything.
 #
 # Output: apps/navit/maps/NAME.bin. The downloaded extract is kept in apps/navit/maps/src/ and
 # reused until Geofabrik publishes a newer one. OpenStreetMap data: ODbL, (c) OpenStreetMap contributors.
@@ -53,13 +54,16 @@ if [ -n "$BBOX" ]; then
 fi
 
 # 3. keep only what a car map needs (referenced nodes and members come along)
-if [ "$FILTER" = roads ]; then
-  echo ">> filter: roads, places, water, borders"
+if [ "$FILTER" = roads ] || [ "$FILTER" = addresses ]; then
+  echo ">> filter: roads, places, water, borders$([ "$FILTER" = addresses ] && echo ", house numbers")"
+  # addresses: house numbers on points and buildings, and interpolation lines between them
+  ADDRESSES=; [ "$FILTER" = addresses ] && ADDRESSES="nwr/addr:housenumber w/addr:interpolation"
+  # shellcheck disable=SC2086  # ADDRESSES is a list of filter expressions
   osmium tags-filter -o "$TMP/filtered.osm.pbf" "$IN" \
     w/highway w/route=ferry r/type=restriction \
     nwr/place \
     nwr/natural=water,coastline,bay nwr/water nwr/waterway=river,riverbank,canal \
-    r/boundary=administrative
+    r/boundary=administrative $ADDRESSES
   IN=$TMP/filtered.osm.pbf
 fi
 

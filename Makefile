@@ -7,7 +7,7 @@
 #   make app    APP=hello   compile apps/hello          -> apps/hello/hello.exe
 #   make deploy APP=hello   compile, copy into the running emulator as \My Flash Disk\Apps\hello, start it
 #   make map                build a Navit map from OpenStreetMap -> apps/navit/maps/italy.bin
-#                           (MAP=name REGION=geofabrik/path [BBOX=left,bottom,right,top] [FILTER=full]; docs/apps/navit.md)
+#                           (MAP=name REGION=geofabrik/path [BBOX=left,bottom,right,top] [FILTER=addresses|full]; docs/apps/navit.md)
 #   make shot               screenshot of the emulator   -> emulator/work/shots/screen.png
 #                           (taps: emulator/emu click X Y)
 #   make shell              a shell inside the dev container
