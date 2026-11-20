@@ -10,6 +10,7 @@
   deploy.py mkdir "\\My Flash Disk\\dev"
   deploy.py run  [--wait SECONDS] "\\My Flash Disk\\dev\\hello.exe" [arguments...]
   deploy.py ps                                                                  running programs
+  deploy.py mem                                                                 free RAM (start a program and compare)
 
 Talks to ceagent.exe inside the guest (emulator/guest/ceagent.c, which documents the
 protocol). The agent listens on the guest's COM2:, which QEMU exposes as TCP 127.0.0.1:5556.
@@ -21,7 +22,7 @@ import struct
 import sys
 
 MAGIC = 0x31414543      # "CEA1"
-PING, PUT, CHUNK, CLOSE, GET, RUN, LIST, DEL, MKDIR, EXIT, PS = range(1, 12)
+PING, PUT, CHUNK, CLOSE, GET, RUN, LIST, DEL, MKDIR, EXIT, PS, MEM = range(1, 13)
 CHUNK_SIZE = 16384
 STILL_RUNNING = 0xFFFFFFFF
 
@@ -105,6 +106,13 @@ def processes(agent):
         print(f"{process_id:>10}  {name}")
 
 
+def memory(agent):
+    load, total, free, virtual_total, virtual_free = struct.unpack("<5I", agent.call(MEM))
+    mb = 1024 * 1024
+    print(f"RAM {free // mb} of {total // mb} MB free ({load} % in use); "
+          f"this process's virtual space: {virtual_free // mb} of {virtual_total // mb} MB free")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--host", default="127.0.0.1")
@@ -114,6 +122,7 @@ def main():
     commands.add_parser("ping")
     commands.add_parser("exit", help="stop the agent")
     commands.add_parser("ps", help="list the running programs")
+    commands.add_parser("mem", help="free memory (with and without a program running: its use)")
     for name, arguments in (("put", ["local", "remote"]), ("get", ["remote", "local"]),
                             ("ls", ["remote"]), ("rm", ["remote"]), ("mkdir", ["remote"])):
         sub = commands.add_parser(name)
@@ -140,6 +149,8 @@ def main():
         agent.call(EXIT)
     elif args.command == "ps":
         processes(agent)
+    elif args.command == "mem":
+        memory(agent)
     elif args.command == "put":
         put(agent, args.local, args.remote)
     elif args.command == "get":

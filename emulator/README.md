@@ -60,7 +60,7 @@ After editing `guest/`, `stubs/` or `build.sh`: `rm -rf emulator/work/stage && m
 | screen | QEMU window (the 480×272 screen scaled to fit; resize it freely), or VNC `127.0.0.1:5901` (`open vnc://127.0.0.1:5901`) | `emu shot/click/dbl` use it through [vncdotool](https://github.com/sibson/vncdotool) |
 | `COM1:` | TCP 5555 | GPS (simulated by `nmeasim`): `emulator/emu up --gps`, or `.venv/bin/python emulator/gps.py --lat .. --lon .. --speed ..` |
 | `COM4:` | – | the same GPS sentences for a second reader (Navit), like the unit's `COM4:` |
-| `COM2:` | TCP 5556 | deploy agent (`emulator/deploy.py`: `push`, `put`, `get`, `ls`, `rm`, `run`, `ps`) |
+| `COM2:` | TCP 5556 | deploy agent (`emulator/deploy.py`: `push`, `put`, `get`, `ls`, `rm`, `run`, `ps`, `mem`) |
 | `COM3:` | TCP 5557 | car link: the unit's car-link program talks here; `emulator/emu up --radio` or `.venv/bin/python emulator/radio.py --rpm .. --speed ..` plays the radio |
 | kernel debug output | `work/serial.log` | `OutputDebugStringW` from any program ends up here |
 | CPU debugger | gdb remote on `127.0.0.1:1234` | |
