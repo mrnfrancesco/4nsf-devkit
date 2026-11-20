@@ -2,6 +2,8 @@
 # Build the emulator's kernel image and disk from firmware/. Runs inside the dev container
 # (make emulator). Finished steps are skipped; after editing guest/, stubs/ or this file:
 #   rm -rf emulator/work/stage && make emulator
+# MAPS="italy roma" (Navit maps, apps/navit/maps/NAME.bin) copies them straight into the disk,
+# far faster than through the agent; the emulator must be stopped (make stop).
 # What each step is for: emulator/README.md.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -79,13 +81,32 @@ if [ ! -f "$STAGE/.done" ]; then
 fi
 
 if [ ! -f "$WORK/disk.img" ]; then
-  echo ">> 8. disk: 4 GB, one FAT32 partition, plus an overlay that takes the guest's writes"
+  # 6 GB: the unit's flash is 4 GB and as full as the copy here; the rest leaves room for big
+  # Navit maps (which on the unit go on the SD card)
+  echo ">> 8. disk: 6 GB, one FAT32 partition, plus an overlay that takes the guest's writes"
   DISK="$WORK/disk.img.part"; FIRST_SECTOR=2048
-  rm -f "$DISK"; truncate -s 4000M "$DISK"
+  rm -f "$DISK"; truncate -s 6000M "$DISK"
   echo "start=$FIRST_SECTOR, type=c, bootable" | sfdisk --quiet "$DISK"
   mkfs.vfat -F 32 -n WINCEDISK --offset "$FIRST_SECTOR" "$DISK" > /dev/null
   mcopy -s -i "$DISK@@$((FIRST_SECTOR * 512))" "$STAGE"/* ::/
   mv "$DISK" "$WORK/disk.img"
+  rm -f "$WORK/disk.qcow2"
+  qemu-img create -q -f qcow2 -b "$WORK/disk.img" -F raw "$WORK/disk.qcow2"
+fi
+
+if [ -n "${MAPS:-}" ]; then
+  echo ">> 9. Navit maps into \\My Flash Disk\\Navit\\maps: $MAPS"
+  # (the Makefile checks that the emulator is stopped: QEMU runs on the host, not in this container)
+  FAT="$WORK/disk.img@@$((2048 * 512))"
+  for map in $MAPS; do
+    [ -f "$ROOT/apps/navit/maps/$map.bin" ] || { echo "no apps/navit/maps/$map.bin: make map MAP=$map ..." >&2; exit 1; }
+  done
+  # the guest's writes so far (deployed apps, settings) go into the base image first
+  qemu-img commit -q "$WORK/disk.qcow2"
+  mmd -i "$FAT" ::/Navit ::/Navit/maps 2>/dev/null || true
+  for map in $MAPS; do
+    mcopy -o -i "$FAT" "$ROOT/apps/navit/maps/$map.bin" ::/Navit/maps/
+  done
   rm -f "$WORK/disk.qcow2"
   qemu-img create -q -f qcow2 -b "$WORK/disk.img" -F raw "$WORK/disk.qcow2"
 fi

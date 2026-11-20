@@ -5,6 +5,9 @@
 /firmware/rom/
 /emulator/work/
 /apps/*/*.exe
+/apps/*/*.dll
+/apps/navit/navit/
+/apps/navit/maps/
 .venv/
 .DS_Store
 __pycache__/

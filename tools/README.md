@@ -46,6 +46,7 @@ Samples:
 
 - `samples/dock-capture.txt`: 53 frames sent by a unit to the radio, posted by "robomrburns" on seatcupra.net in 2016.
 - `samples/appcom-capture.txt`: 200 datagrams (66 different ones) sent by the unit's menu, navigation, phone and media programs while they ran in the emulator; one line per datagram and receiving port: `TICK PORT LENGTH HEX`.
+- `samples/appcom-unit-capture.txt`: 657 datagrams received by `apps/appcom` on a real unit during a drive (radio, Bluetooth music, a phone call, parking sensors, standby), anonymised; what was changed: [appcom.md](../docs/apps/appcom.md) §14.
 
 Text strings in a binary: Windows CE uses UTF-16, which plain `strings` misses. Use GNU strings from the dev container:
 `sdk/run arm-mingw32ce-strings -e l FILE` (UTF-16) and `sdk/run arm-mingw32ce-strings FILE` (ASCII).

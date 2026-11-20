@@ -478,6 +478,7 @@ send29(5, 3, 1, 0, -1);    // release with the same prio / type
 //    pause while the winner type is 0 (phone) or 1 (voice dialog), duck while it is 2.
 ```
 
+- Worked example: `apps/navit/navitsnd.c` does this for a program that cannot be changed (Navit): it takes the program's `waveOutWrite` over (import redirected with `emulator/patches/redirect_imports.py --only`), claims type 2 with prio 2 before the first buffer, releases one second after the last one has played ✅ emulator (messages), ❓ car.
 - A claim with a prio that another program already uses overwrites that program's entry in every receiver (the map key is the prio) → pick the kind you really are, and expect MediaPlayer to announce its own claim again when its source changes.
 - Undocked, the internal speaker is on; nothing to claim, but the pause rules still apply.
 - The radio's volume / mute / source can be read from shared memory without AppCom ([shared-memory.md](../car/shared-memory.md) §8.2): slots 0x210…0x224, data ids 86, 87, 82.

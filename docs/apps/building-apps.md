@@ -22,6 +22,7 @@ The apps in `apps/`:
 | `hello` | the template: a window, the command line the menu passes, tap to exit |
 | `cardata` | live vehicle data read from the unit's shared memory (below: "Using the unit's services"); `cardata.exe set …` writes it |
 | `appcom` | the messages the unit's programs send each other: records them for `tools/appcom.py`, sends hand-made ones |
+| `navit` | a launcher that picks OpenStreetMap maps and starts Navit, an open-source navigation program ([navit.md](navit.md)) |
 
 `apps/include/` holds headers for the unit's services, shared by the apps (`-I../include` in the app's `Makefile`): `vwshm.h`, the layout of the vehicle data.
 
@@ -44,7 +45,7 @@ How the VW menu uses `NgAppInfo.xml` (✅ seen in the emulator, which runs the u
 - It reads `\My Flash Disk\Apps\*\NgAppInfo.xml` **once, when it starts**, and lists every app with `<IsVisible>1` under **more**. A newly deployed app shows up there after the next `make stop` / `make run`.
 - When the entry is tapped, the menu looks for a window with the class `<ClassName>` and title `<WindowName>`. If there is one, it comes to the front. If not, the menu starts `<Exe>` with the arguments ` language=eng-GBR skin=VW` (its current language, and the brand: `VW`, `Seat` or `Skoda`; the program receives exactly this string, leading blank included, as its command line). A program may ignore them.
 - So the class and title in the XML must be the ones your program gives its main window; otherwise every tap starts another copy.
-- `<Port>` is the app's address for messages from other apps (UDP on 127.0.0.1). It must be unique: 27011–27021 and 27103–27110 are taken by the unit, 27111–27113 by the apps here. A program that never listens on it is still listed and started.
+- `<Port>` is the app's address for messages from other apps (UDP on 127.0.0.1). It must be unique: 27011–27021 and 27103–27110 are taken by the unit, 27111–27114 by the apps here. A program that never listens on it is still listed and started.
 - Only the **first** `<Application>` of each `NgAppInfo.xml` is read, one file per folder.
 
 ```xml
@@ -97,15 +98,15 @@ Check what you built: `.venv/bin/python tools/peinfo.py apps/myapp/myapp.exe` (C
 
 The emulator runs Windows CE **7** on a generic board; the unit runs CE **6** on its own hardware. Program logic, UI and the unit's app-to-app messaging behave the same. Not available in the emulator: Bluetooth, audio, the graphics accelerator, the radio's own functions (BAP); vehicle data comes from a simulated radio ("Car data in the emulator" below). See [emulator/README.md](../../emulator/README.md).
 
-## Installing on a real unit (untested by this project)
+## Installing on a real unit
 
-Reported by the community (jilleb/4nsf-toolbox): connect the unit over USB, copy the app's folder (program, `NgAppInfo.xml`, icon) into `\My Flash Disk\Apps\`, restart. No other file needs editing. The stock add-ons also ship `NgAlloc.dll` and `Png.dll` in their folder; a program that does not import them does not need them.
+Connect the unit over USB, copy the app's folder (program, `NgAppInfo.xml`, icon) into `\My Flash Disk\Apps\`, restart. No other file needs editing (first reported by jilleb/4nsf-toolbox; ✅ unit 2026-11-20: `hello`, `cardata`, `appcom` and `navit` installed this way show up under "more" and run, and `cardata` showed the car's values). The stock add-ons also ship `NgAlloc.dll` and `Png.dll` in their folder; a program that does not import them does not need them.
 
 Back up the unit first (copy the whole USB volume). The unit shows up as a USB drive only when the cable is plugged in **before** it boots; plugging it into a computer while the software runs makes the unit reset into USB mode ✅ ([boot-and-supervision.md](../system/boot-and-supervision.md) §2.2).
 
 Second way in, without changing anything on the unit (✅ read in the boot program, 🟡 **untested**): the unit's boot manager looks for `\Storage Card\AutoRunCE.exe` before the copy on its own flash and runs it without any check. An SD card with an `AutoRunCE.exe` (any Windows CE program, or the stock launcher + `MortScript.exe` + your own `autorunce.mscr` that ends with `Run("\My Flash Disk\autorunce.exe")` to continue the normal start) therefore runs your code at boot; remove the card and the unit is stock again. The card has to be readable within a few seconds after power-on. Never put files named `update.me`, `NK.nb0`, `*.bin` or `UpdateMe.exe` in the root of the card or of the flash: the boot loader treats them as a firmware update. Details and the other hooks (boot script, watchdog list): [boot-and-supervision.md](../system/boot-and-supervision.md) §8.1, §7.2.
 
-### Rules of the house (✅ from the unit's software, nothing tested on a unit)
+### Rules of the house (✅ from the unit's software; the crash rules not tried on a unit)
 
 - **A crash reboots the unit.** The crash handler (`ErrorReporter.exe`) resets the device after an unhandled exception in any program that is not on its `[NoResetAfterException]` list in `\My Flash Disk\ErrorReporter.ini` — and yours is not. Catch your exceptions, or add your exe name to that list. With `<Autostart>1` a program that crashes at start becomes a reboot loop 🟡.
 - **Menu apps are not supervised**: nothing restarts or watches a program started from "more". If you add your program to the watchdog's list instead (`Watchdog_HW.ini`), the contract is: the watchdog creates the named events listed in your ini (auto-reset, initially set); your program opens them by name and calls `SetEvent` on each at least once per timeout (stock value 30 s); a missed deadline or an exit triggers the configured action. Use action 0 (ignore) or 2 (restart) — the stock style, 1, turns every exit into a device reset ([boot-and-supervision.md](../system/boot-and-supervision.md) §3.3, §8.1).
@@ -145,7 +146,7 @@ None of this needs one of the C++ DLLs. Tried in the emulator (✅ emulator in t
 | Messages from / to the other programs (language change, phone state, GPS status, suspend notice) ✅ emulator | UDP datagrams on 127.0.0.1, your `<Port>`; add `<Group>` lines to receive group messages. `<Group>SpeedInfoCan</Group>` alone gets you the car speed once per second without touching the shared memory. Sending works too: a hand-made message changes the menu's language or status icons. Working example and capture tool: `apps/appcom` | [appcom.md](appcom.md) §9 (catalogue), §11 (how to), §13 (what was captured) |
 | Play sound without fighting navigation prompts, calls and the radio | own `waveOut` stream + announce it with AppCom message 29 ("sound manager"); docked, nothing is heard until that claim makes the menu ask the radio for the audio channel | [media-audio.md](../system/media-audio.md) §11.2 |
 | Brand, VIN, device id, cradle state, brightness, power source | `WolfSpecial.dll` or `HWLHardwareLayer.dll` (table above) ✅ emulator for `ReadHiddenFlash`, `ReadFlash`, `GetDeviceID`, `IsCradleStatusConnected` called from a C program (against an earlier build of the emulator's stand-in; load the DLLs by full path from `\My Flash Disk\VwUserShell\`, `NgAlloc.dll` and `cestub.dll` first); cradle and power events arrive as registered window messages | [hardware-layer.md](../system/hardware-layer.md) §4.5, §3.1 |
-| GPS position | NMEA on `COM2:` 57600 8N1 (`$GPGGA`, `$GPRMC`) — but the navigation has that port open; whether a second program can open it too ❓. Alternative 🟡: AppCom group messages 11011 / 11012 (`SpeedInfoGps`, `PositionInfo`); in the emulator a member app received none while the navigation had no fix | [navigation.md](../system/navigation.md) §3.2, [appcom.md](appcom.md) §9.8 |
+| GPS position | NMEA on `COM2:` 57600 8N1 (`$GPGGA`, `$GPRMC`) — but the navigation has that port open; whether a second program can open it too ❓. ✅ unit: the GPS driver's copy on `COM4:` works next to the navigation ([navit.md](navit.md)). Alternative ✅ unit: AppCom group messages 11011 / 11012 (`SpeedInfoGps`, `PositionInfo`: speed, speed limit, longitude / latitude, about once a second while the navigation has a fix) | [navigation.md](../system/navigation.md) §3.2, [appcom.md](appcom.md) §9.8 |
 | Phone functions | drive the stock Bluetooth core through `nfBT.dll` or its window messages | [bluetooth.md](../system/bluetooth.md) §9.1 |
 | Look like the stock screens | reuse the unit's bitmaps, fonts and texts | [ui-framework.md](../system/ui-framework.md) §11 |
 

@@ -2,6 +2,7 @@
 # Run a command inside the dev container, with the repo mounted at the same path and the
 # current directory preserved.   sdk/run arm-mingw32ce-gcc --version   |   sdk/run make -C apps/hello
 # Container runtime: Apple `container`, docker or podman (first one found; override with CONTAINER=).
+# MEMORY=8g gives the container more memory than the runtime's default (Apple container: 1 GB).
 set -eu
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 IMAGE=4nsf-sdk
@@ -22,4 +23,5 @@ if ! "$C" image inspect "$IMAGE" >/dev/null 2>&1; then
 fi
 # shellcheck disable=SC2086
 TTY=""; [ -t 0 ] && [ -t 1 ] && TTY="-it"
-exec "$C" run --rm $TTY $PLATFORM -v "$ROOT:$ROOT" -w "$PWD" "$IMAGE" "$@"
+MEM=""; [ -n "${MEMORY:-}" ] && MEM="--memory $MEMORY"
+exec "$C" run --rm $TTY $PLATFORM $MEM -v "$ROOT:$ROOT" -w "$PWD" "$IMAGE" "$@"

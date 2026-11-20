@@ -20,7 +20,7 @@ QEMU has no model of the unit's processor board (STMicroelectronics Cartesio+), 
 |---|---|---|
 | Machine | `qemu-system-arm`, board `vexpress-a15`, 256 MB | stock QEMU, started by `emulator/emu` with `-icount` (see "The clock" below) |
 | Kernel | Windows Embedded Compact 7 image prebuilt by [Milek7/wince-qemu](https://github.com/Milek7/wince-qemu) | downloaded by `build.sh`, SHA-256 pinned |
-| Disk | 4 GB FAT32 image mounted as `\My Flash Disk` | a copy of `firmware/flash/` with the changes below |
+| Disk | 6 GB FAT32 image mounted as `\My Flash Disk` (the unit's flash is 4 GB; the rest is room for big Navit maps) | a copy of `firmware/flash/` with the changes below |
 | Unit-specific system DLLs | the unit's own system image (`firmware/rom/`) | copied next to each program instead of living in `\Windows` |
 
 What `build.sh` does, step by step:
@@ -32,7 +32,8 @@ What `build.sh` does, step by step:
 5. **System DLLs next to every program**: our stand-ins from `stubs/`, then the unit's own DLLs and fonts from `firmware/rom/files/` (on the unit they live in `\Windows`).
 6. **Settings**: GPS on `COM1:`, the car link on `COM3:` (the unit uses `COM9:`), Navigon's software map renderer, the no-GPS restart timer raised, the boot animation disabled (it crashes without the unit's graphics accelerator). Pairing needs no setting: the stand-in's hidden flash says "paired with a Volkswagen", and there is no `BrandDevice.reg` file, which would send the brand program back to waiting for a car.
 7. **Guest programs** from `guest/`, copied to `\My Flash Disk\0start` and `\My Flash Disk\dev`.
-8. **Disk**: one 4 GB FAT32 partition (`sfdisk`, `mkfs.vfat`, `mcopy`), plus a qcow2 overlay.
+8. **Disk**: one 6 GB FAT32 partition (`sfdisk`, `mkfs.vfat`, `mcopy`), plus a qcow2 overlay that takes the guest's writes.
+9. **Maps** (only with `MAPS="italy roma"`, emulator stopped): Navit maps from `apps/navit/maps/` straight into `\My Flash Disk\Navit\maps`, in seconds instead of hours through the agent. The overlay is first folded into the disk (`qemu-img commit`), so deployed apps and settings stay. mtools stores names that fit 8.3 in capitals (`ITALY.BIN`). A second disk as SD card does not work: this kernel's disk driver serves only one.
 
 The stand-ins in `stubs/` (plain C):
 
@@ -47,9 +48,9 @@ The programs in `guest/`:
 
 | Program | Role |
 |---|---|
-| `launch.exe` | what `emu up` double-clicks: hides the taskbar, adds `COM2:`/`COM3:`, starts the agent and the VW processes (car link, brand program, menu, phone hidden; like the unit's watchdog it waits for the brand program to finish before starting the menu); then sends the phone its language (AppCom msg 2, `LANGUAGE` in `launch.c`, default `eng-GBR`), which on the unit comes from navigon |
+| `launch.exe` | what `emu up` double-clicks: hides the taskbar, adds `COM2:`/`COM3:`, takes over `COM1:` and adds `COM4:` (the GPS copy, below), turns console output off like the unit's registry does (`HKLM\Drivers\Console\OutputTo = -1`: no text windows from programs that print), starts the agent and the VW processes (car link, brand program, menu, phone hidden; like the unit's watchdog it waits for the brand program to finish before starting the menu); then sends the phone its language (AppCom msg 2, `LANGUAGE` in `launch.c`, default `eng-GBR`), which on the unit comes from navigon |
 | `ceagent.exe` | deploy agent on `COM2:`; receives files, starts and lists programs for `deploy.py` |
-| `pl011poll.dll` | serial-port driver behind `COM2:` and `COM3:` |
+| `pl011poll.dll` | serial-port driver behind `COM1:`, `COM2:` and `COM3:`; on `COM1:` it also copies each received line into the message queue `TX_NMEA`, and it serves `COM4:` from that queue, as the unit's GPS driver and `LoopbackCOM.dll` do ([docs/apps/navit.md](../docs/apps/navit.md#the-gps-why-com4)). The unit's own `LoopbackCOM.dll` is not used: the copy extracted from the ROM does not load (error 193) |
 
 After editing `guest/`, `stubs/` or `build.sh`: `rm -rf emulator/work/stage && make emulator`. To use another VIN than the placeholder, add `VIN=<17 characters>` to that `make emulator`.
 
@@ -58,8 +59,9 @@ After editing `guest/`, `stubs/` or `build.sh`: `rm -rf emulator/work/stage && m
 | Guest | Host | Use |
 |---|---|---|
 | screen | QEMU window (the 480×272 screen scaled to fit; resize it freely), or VNC `127.0.0.1:5901` (`open vnc://127.0.0.1:5901`) | `emu shot/click/dbl` use it through [vncdotool](https://github.com/sibson/vncdotool) |
-| `COM1:` | TCP 5555 | GPS (simulated by `nmeasim`): `emulator/emu up --gps`, or `.venv/bin/python emulator/gps.py --lat .. --lon .. --speed ..` |
-| `COM2:` | TCP 5556 | deploy agent (`emulator/deploy.py`: `push`, `put`, `get`, `ls`, `rm`, `run`, `ps`) |
+| `COM1:` | TCP 5555 | GPS (simulated by `nmeasim`): `emulator/emu up --gps`, or `.venv/bin/python emulator/gps.py --lat .. --lon .. --speed ..` (a straight line), or `--track FILE.gpx --speed ..` (along a GPX track, then stop; sample: `emulator/tracks/roma-nomentana.gpx`) |
+| `COM4:` | – | the same GPS sentences for a second reader (Navit), like the unit's `COM4:` |
+| `COM2:` | TCP 5556 | deploy agent (`emulator/deploy.py`: `push`, `put`, `get`, `ls`, `rm`, `run`, `ps`, `mem`) |
 | `COM3:` | TCP 5557 | car link: the unit's car-link program talks here; `emulator/emu up --radio` or `.venv/bin/python emulator/radio.py --rpm .. --speed ..` plays the radio |
 | kernel debug output | `work/serial.log` | `OutputDebugStringW` from any program ends up here |
 | CPU debugger | gdb remote on `127.0.0.1:1234` | |
@@ -93,7 +95,7 @@ while it runs
 
 to build it (make emulator)
   build.sh       builds work/ from firmware/ (the eight steps above)
-  patches/       patch_kernel.py, redirect_imports.py: the two binary patchers build.sh uses
+  patches/       patch_kernel.py, redirect_imports.py: the two binary patchers build.sh uses (apps/navit/fetch.sh also uses redirect_imports.py --only)
   guest/         programs that run inside the emulator
   stubs/         stand-ins for DLLs the emulator's Windows lacks
 

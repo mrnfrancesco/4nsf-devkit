@@ -22,7 +22,8 @@ The format, as implemented in ACAppCom.dll / NgAppCom.dll (docs/apps/appcom.md h
                3 Pair     two values             {"pair": [key, value]}
                4 List     uint32 count, values   [...]
                5, 6 Binary  uint32 size, bytes, padded to 4. Type 6 carries the strings, as UTF-8:
-                          "text", or {"hex": "..."} if it is not text; type 5: {"type5": ...}
+                          "text"; navigon's 11011 / 11012 hold UTF-16 with a 0 at the end:
+                          {"utf16": "text"}; {"hex": "..."} if it is not text; type 5: {"type5": ...}
                7 Float    float64                1.5
                8 Int      int32                  1
                9 Int64    int64                  {"int64": 1}
@@ -67,6 +68,8 @@ def encode(value):
     (tag, content), = value.items()
     if tag == "hex":
         return binary(BINARY, bytes.fromhex(content))
+    if tag == "utf16":
+        return binary(BINARY, (content + "\0").encode("utf-16-le"))
     if tag == "type5":
         return binary(BINARY5, content.encode("utf-8") if isinstance(content, str) else bytes.fromhex(content["hex"]))
     if tag == "int64":
@@ -99,10 +102,12 @@ def decode(data, position=0):
         contents = data[position + 4:position + 4 + size]
         if len(contents) != size:
             raise ValueError("binary longer than the message")
-        try:
-            value = contents.decode("utf-8")
-        except UnicodeDecodeError:
-            value = {"hex": contents.hex()}
+        value = utf16(contents) if kind == BINARY else None
+        if value is None:
+            try:
+                value = contents.decode("utf-8")
+            except UnicodeDecodeError:
+                value = {"hex": contents.hex()}
         return (value if kind == BINARY else {"type5": value}), position + 4 + size + -size % 4
     if kind == LIST:
         count, = struct.unpack_from("<I", data, position)
@@ -121,6 +126,18 @@ def decode(data, position=0):
     if kind == RECT:
         return {"rect": list(struct.unpack_from("<4f", data, position))}, position + 16
     raise ValueError(f"unknown value type {kind}")
+
+
+def utf16(contents):
+    """{"utf16": text} if `contents` is printable ASCII text as UTF-16 with one 0 at the end (the
+    country codes of 11011 / 11012), else None: other bytes that happen to decode stay as they are."""
+    if len(contents) < 4 or len(contents) % 2 or not contents.endswith(b"\0\0"):
+        return None
+    try:
+        text = contents[:-2].decode("utf-16-le")
+    except UnicodeDecodeError:
+        return None
+    return {"utf16": text} if text.isascii() and text.isprintable() else None
 
 
 def datagrams(sender_port, message):

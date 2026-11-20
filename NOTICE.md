@@ -23,6 +23,9 @@ The findings these files encode (hidden-flash layout, board API signatures, kern
 
 ## Other third-party content in the repository
 
+- `apps/navit/navit.xml.diff`: changes to `navit.xml` of [Navit](https://github.com/navit-gps/navit) 0.5.7; like that file, GPL-2.0.
+- `apps/navit/navit.c`: the table of ISO 3166 country codes (three and two letters) comes from Navit's `country.c`; the codes themselves are an international standard.
+- `emulator/tracks/roma-nomentana.gpx`: a road in Rome taken from OpenStreetMap (© OpenStreetMap contributors, ODbL 1.0), test drive for `emulator/gps.py --track`.
 - `tools/samples/dock-capture.txt`: 53 serial frames posted by "robomrburns" on seatcupra.net (2016, thread "Garmin PID / Garmin mod skin tool / reverse engineering"). Included as test data; not covered by this project's licences.
 
 ## Downloaded at setup time, never stored in the repository
@@ -32,7 +35,9 @@ The findings these files encode (hidden-flash layout, board API signatures, kern
 - Windows Embedded Compact 7 kernel image for QEMU: [Milek7/wince-qemu](https://github.com/Milek7/wince-qemu), release 2022-04-17 (contains Microsoft code; no licence stated upstream).
 - CeGCC cross-compiler image: `ghcr.io/enlyze/windows-ce-build-environment-arm` ([enlyze/cegcc-build](https://github.com/enlyze/cegcc-build)).
 - The unit's software: Volkswagen's public update package (© Garmin / Navigon / Volkswagen).
-- Python packages in `requirements.txt` (`pefile`, `vncdotool`, `nmeasim`, `crccheck`, `dissect.cstruct`, `Pillow`), Debian packages in `sdk/Containerfile`.
+- Navit for Windows CE, `navit-wince-v0.5.7.zip` from [navit-gps/navit](https://github.com/navit-gps/navit/releases/tag/v0.5.7) (GPL-2.0; source in the same release), by `apps/navit/fetch.sh` (`make app APP=navit`), with the eSpeak speech data it contains (`espeak-data/`, GPL). `fetch.sh` changes the downloaded `navit.exe` locally (debug information removed, `waveOutWrite` taken from `apps/navit/navitsnd.c`); nothing of it is stored in this repository.
+- OpenStreetMap extracts from [Geofabrik](https://download.geofabrik.de/) (© OpenStreetMap contributors, ODbL), by `apps/navit/build_map.sh` (`make map`); the maps built from them stay under the ODbL.
+- Python packages in `requirements.txt` (`pefile`, `vncdotool`, `nmeasim`, `gpxpy`, `crccheck`, `dissect.cstruct`, `Pillow`), Debian packages in `sdk/Containerfile`.
 
 Not downloaded, optional: `tools/decompile.py` calls [radare2](https://github.com/radareorg/radare2) with the [r2ghidra](https://github.com/radareorg/r2ghidra) plugin if they are installed on the host.
 

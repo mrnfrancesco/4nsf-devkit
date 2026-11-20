@@ -10,11 +10,20 @@
  * an NMEA feed in the emulator; it is not meant for a real device.
  *
  * Loaded at run time by launch.exe (registry key + ActivateDeviceEx), see
- * launch.c for the values. Stream interface: COM_Init/Deinit/Open/Close/
+ * launch.c for the values. Two extras for the unit's GPS copy (docs/apps/navit.md):
+ *  - "Mirror" (string): name of a message queue that also gets every received line,
+ *    the way the unit's GPS driver copies its NMEA into the queue TX_NMEA;
+ *  - "RXQUEUE" (string) instead of "IoBase": no UART, the port reads that message queue.
+ *    This stands in for the unit's LoopbackCOM.dll (its COM4:), whose copy extracted
+ *    from the ROM does not load here (error 193, not a loadable image). Stream interface: COM_Init/Deinit/Open/Close/
  * Read/Write/Seek/IOControl, with the serial IOCTLs that SetCommState,
  * SetCommTimeouts, SetCommMask, WaitCommEvent and friends in coredll use.
  */
 #include <windows.h>
+#include <msgqueue.h>
+
+/* coredll exports it; CeGCC's msgqueue.h does not declare it */
+BOOL WriteMsgQueue(HANDLE queue, LPVOID buffer, DWORD size, DWORD timeout, DWORD flags);
 
 /* PL011 registers (byte offsets) */
 #define UARTDR   0x000
@@ -69,6 +78,10 @@ typedef struct {
     COMMTIMEOUTS to;
     DWORD waitMask;
     LONG openCount;
+    HANDLE mirror;                  /* message queue that gets a copy of each line, or NULL */
+    HANDLE source;                  /* queue mode: message queue read instead of a UART */
+    BYTE line[1518];                /* the unit's queue size (registry MaxMessageBytes 0x5ee) */
+    DWORD lineLength;
 } PORT;
 
 static DWORD reg32(PORT *p, DWORD off) { return *(volatile DWORD *)(p->base + off); }
@@ -79,12 +92,34 @@ static DWORD WINAPI pollProc(LPVOID ctx)
     PORT *p = ctx;
     while (!p->stop) {
         BOOL got = FALSE;
+        if (p->source) {
+            DWORD size, flags, i;
+            if (ReadMsgQueue(p->source, p->line, sizeof p->line, &size, 100, &flags)) {
+                for (i = 0; i < size; i++) {
+                    DWORD next = (p->head + 1) % RING;
+                    if (next != p->tail) {
+                        p->ring[p->head] = p->line[i];
+                        p->head = next;
+                    }
+                }
+                SetEvent(p->rxEvent);
+            } else if (GetLastError() != ERROR_TIMEOUT)
+                Sleep(100);             /* no writer yet, or an error: do not spin */
+            continue;
+        }
         while (!(reg32(p, UARTFR) & FR_RXFE)) {
             DWORD next = (p->head + 1) % RING;
             BYTE c = (BYTE)reg32(p, UARTDR);
             if (next != p->tail) {      /* drop on overflow */
                 p->ring[p->head] = c;
                 p->head = next;
+            }
+            if (p->mirror) {            /* never blocks: a full queue drops the line */
+                p->line[p->lineLength++] = c;
+                if (c == '\n' || p->lineLength == sizeof p->line) {
+                    WriteMsgQueue(p->mirror, p->line, p->lineLength, 0, 0);
+                    p->lineLength = 0;
+                }
             }
             got = TRUE;
         }
@@ -107,6 +142,18 @@ static BOOL regDword(LPCWSTR key, LPCWSTR name, DWORD *out)
     return r == ERROR_SUCCESS;
 }
 
+static BOOL regString(LPCWSTR key, LPCWSTR name, wchar_t *out, DWORD size)
+{
+    HKEY h;
+    DWORD type;
+    LONG r = RegOpenKeyExW(HKEY_LOCAL_MACHINE, key, 0, 0, &h);
+    if (r != ERROR_SUCCESS)
+        return FALSE;
+    r = RegQueryValueExW(h, name, NULL, &type, (LPBYTE)out, &size);
+    RegCloseKey(h);
+    return r == ERROR_SUCCESS;
+}
+
 /* ---- stream interface -------------------------------------------------- */
 DWORD COM_Init(LPCWSTR context)
 {
@@ -114,20 +161,29 @@ DWORD COM_Init(LPCWSTR context)
     DWORD iobase = 0;
     /* context is the active key; the driver's own key is in its "Key" value */
     HKEY h;
-    wchar_t key[256];
+    wchar_t key[256], name[64];
     DWORD type, size = sizeof key;
     key[0] = 0;
     if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, context, 0, 0, &h) == ERROR_SUCCESS) {
         RegQueryValueExW(h, L"Key", NULL, &type, (LPBYTE)key, &size);
         RegCloseKey(h);
     }
-    if (!key[0] || !regDword(key, L"IoBase", &iobase) || !iobase) {
-        OutputDebugStringW(L"PL011POLL: no IoBase");
-        return 0;
-    }
     p = (PORT *)LocalAlloc(LPTR, sizeof(PORT));
     if (!p)
         return 0;
+    if (key[0] && regString(key, L"RXQUEUE", name, sizeof name)) {
+        MSGQUEUEOPTIONS options = { sizeof options, 0, 100, sizeof p->line, TRUE };
+        p->source = CreateMsgQueue(name, &options);             /* read end */
+        if (!p->source) {
+            OutputDebugStringW(L"PL011POLL: cannot open the RXQUEUE message queue");
+            LocalFree(p);
+            return 0;
+        }
+    } else if (!key[0] || !regDword(key, L"IoBase", &iobase) || !iobase) {
+        OutputDebugStringW(L"PL011POLL: no IoBase");
+        LocalFree(p);
+        return 0;
+    }
     p->base = (volatile BYTE *)iobase;
     p->rxEvent = CreateEventW(NULL, FALSE, FALSE, NULL);
     p->dcb.DCBlength = sizeof(DCB);
@@ -135,11 +191,17 @@ DWORD COM_Init(LPCWSTR context)
     p->dcb.ByteSize = 8;
     p->dcb.fBinary = TRUE;
     p->to.ReadIntervalTimeout = MAXDWORD;       /* default: return immediately */
-    /* enable the UART: 8N1, FIFOs, TX+RX, no interrupts */
-    wreg32(p, UARTIMSC, 0);
-    wreg32(p, UARTICR, 0x7ff);
-    wreg32(p, UARTLCRH, 0x70);
-    wreg32(p, UARTCR, 0x301);
+    if (!p->source) {
+        /* enable the UART: 8N1, FIFOs, TX+RX, no interrupts */
+        wreg32(p, UARTIMSC, 0);
+        wreg32(p, UARTICR, 0x7ff);
+        wreg32(p, UARTLCRH, 0x70);
+        wreg32(p, UARTCR, 0x301);
+    }
+    if (key[0] && regString(key, L"Mirror", name, sizeof name)) {
+        MSGQUEUEOPTIONS options = { sizeof options, 0, 100, sizeof p->line, FALSE };
+        p->mirror = CreateMsgQueue(name, &options);             /* write end, like GPS.dll */
+    }
     p->pollThread = CreateThread(NULL, 0, pollProc, p, 0, NULL);
     {
         wchar_t msg[96];
@@ -158,6 +220,10 @@ BOOL COM_Deinit(DWORD ctx)
     WaitForSingleObject(p->pollThread, 1000);
     CloseHandle(p->pollThread);
     CloseHandle(p->rxEvent);
+    if (p->mirror)
+        CloseMsgQueue(p->mirror);
+    if (p->source)
+        CloseMsgQueue(p->source);
     LocalFree(p);
     return TRUE;
 }
@@ -170,6 +236,8 @@ DWORD COM_Open(DWORD ctx, DWORD access, DWORD share)
         SetLastError(ERROR_ACCESS_DENIED);
         return 0;
     }
+    if (p->source)                  /* like the unit's serial drivers: start with no old data */
+        p->tail = p->head;
     return ctx;
 }
 
@@ -225,6 +293,8 @@ DWORD COM_Write(DWORD open, LPCVOID buf, DWORD len)
     PORT *p = (PORT *)open;
     const BYTE *in = buf;
     DWORD i;
+    if (p->source)                  /* queue mode: nothing to send to */
+        return len;
     for (i = 0; i < len; i++) {
         while (reg32(p, UARTFR) & FR_TXFF)
             Sleep(0);

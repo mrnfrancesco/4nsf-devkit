@@ -30,7 +30,9 @@ enum command {
     CMD_DEL   = 8,  /* path                   -> OK                                           */
     CMD_MKDIR = 9,  /* path                   -> OK                                           */
     CMD_EXIT  = 10, /* -                      -> OK, then the agent exits                     */
-    CMD_PS    = 11  /* -                      -> text lines "program\tprocess id\n"            */
+    CMD_PS    = 11, /* -                      -> text lines "program\tprocess id\n"            */
+    CMD_MEM   = 12  /* -                      -> u32 load %, total / free RAM, total / free
+                                                  virtual (GlobalMemoryStatus), bytes           */
 };
 
 static HANDLE port = INVALID_HANDLE_VALUE;
@@ -292,6 +294,22 @@ static void processes(BYTE *scratch)
     send_frame(STATUS_OK, text, used * 2);
 }
 
+/* Windows CE 6 has no memory figure per process: compare free RAM with and without a program. */
+static void memory(void)
+{
+    MEMORYSTATUS status;
+    DWORD figures[5];
+
+    status.dwLength = sizeof status;
+    GlobalMemoryStatus(&status);
+    figures[0] = status.dwMemoryLoad;
+    figures[1] = status.dwTotalPhys;
+    figures[2] = status.dwAvailPhys;
+    figures[3] = status.dwTotalVirtual;
+    figures[4] = status.dwAvailVirtual;
+    send_frame(STATUS_OK, figures, sizeof figures);
+}
+
 /* ---- main loop -------------------------------------------------------------------------- */
 
 /* Serves requests until the link fails (returns TRUE) or the host asks to exit (FALSE). */
@@ -313,6 +331,7 @@ static BOOL serve(BYTE *payload, BYTE *scratch)
         case CMD_DEL:   reply(DeleteFileW((wchar_t *)payload)); break;
         case CMD_MKDIR: reply(CreateDirectoryW((wchar_t *)payload, NULL)); break;
         case CMD_PS:    processes(scratch); break;
+        case CMD_MEM:   memory(); break;
         case CMD_EXIT:  reply_ok(); return FALSE;
         default:        reply_error(ERROR_INVALID_FUNCTION); break;
         }

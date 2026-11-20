@@ -5,11 +5,14 @@
  * program does the starting (no supervision), plus two emulator chores:
  *
  *  1. hide the Explorer taskbar: it covers the bottom 26 px, where the VW apps draw buttons
- *  2. add the serial ports COM2: and COM3: (the Windows image only knows COM1:)
+ *  2. add the serial ports COM2: and COM3: (the Windows image only knows COM1:), take over
+ *     COM1: (GPS) and add COM4:, the unit's copy of the GPS data (docs/apps/navit.md)
  *  3. start the deploy agent on COM2: (host side: emulator/deploy.py)
  *  4. start the VW processes with the command lines from the unit's Watchdog_*.ini;
  *     like the watchdog, wait for the brand app to finish before starting the menu
- *  5. tell the phone program the language. It starts with built-in ger-DEU texts and waits for
+ *  5. turn console output off, as on the unit (HKLM\Drivers\Console\OutputTo = -1, in the unit's
+ *     ROM registry): programs that print (Navit) would otherwise open text windows here
+ *  6. tell the phone program the language. It starts with built-in ger-DEU texts and waits for
  *     navigon.exe to send the unit's language (AppCom message 2, setting 2). navigon.exe is not
  *     started here, so this program sends that message in its place (as navigon's port 27011).
  *
@@ -38,11 +41,22 @@ static void log_line(const wchar_t *format, ...)
     OutputDebugStringW(line);
 }
 
+static void set_string(HKEY key, const wchar_t *name, const wchar_t *value)
+{
+    RegSetValueExW(key, name, 0, REG_SZ, (const BYTE *)value, (wcslen(value) + 1) * sizeof *value);
+}
+
+static void set_dword(HKEY key, const wchar_t *name, DWORD value)
+{
+    RegSetValueExW(key, name, 0, REG_DWORD, (const BYTE *)&value, sizeof value);
+}
+
 /*
  * Register one more UART of the QEMU board as COMn:, served by our polled driver.
- * `registers` is the kernel virtual address of that UART's register block.
+ * `registers` is the kernel virtual address of that UART's register block. `mirror`: name of
+ * a message queue that also gets each received line, or NULL.
  */
-static void add_serial_port(DWORD n, DWORD registers)
+static void add_serial_port(DWORD n, DWORD registers, const wchar_t *mirror)
 {
     wchar_t key[80];
     HKEY settings;
@@ -53,14 +67,50 @@ static void add_serial_port(DWORD n, DWORD registers)
         log_line(L"LAUNCH: COM%d: cannot create registry key", n);
         return;
     }
-    RegSetValueExW(settings, L"Dll", 0, REG_SZ, (const BYTE *)DRIVER, sizeof DRIVER);
-    RegSetValueExW(settings, L"Prefix", 0, REG_SZ, (const BYTE *)L"COM", sizeof L"COM");
-    RegSetValueExW(settings, L"Index", 0, REG_DWORD, (const BYTE *)&n, sizeof n);
-    RegSetValueExW(settings, L"IoBase", 0, REG_DWORD, (const BYTE *)&registers, sizeof registers);
+    set_string(settings, L"Dll", DRIVER);
+    set_string(settings, L"Prefix", L"COM");
+    set_dword(settings, L"Index", n);
+    set_dword(settings, L"IoBase", registers);
+    if (mirror)
+        set_string(settings, L"Mirror", mirror);
     RegCloseKey(settings);
 
     device = ActivateDeviceEx(key, NULL, 0, NULL);
     log_line(L"LAUNCH: COM%d: at %08x -> %s", n, registers, device ? L"ok" : L"FAILED");
+}
+
+/*
+ * The unit's GPS driver (COM2: there) copies every NMEA sentence into the message queue TX_NMEA;
+ * its LoopbackCOM.dll serves that queue as COM4:, so a second program can read the GPS while
+ * navigon.exe holds COM2:. Here the GPS is COM1: (host TCP 5555): our driver takes it over from
+ * the image's own one to make the copy, and serves COM4: from the queue too, with the unit's
+ * registry values (HKLM\Drivers\BuiltIn\GPS_DEBUG_COM) apart from the DLL name.
+ */
+static void add_gps_ports(DWORD com1_registers)
+{
+    DEVMGR_DEVICE_INFORMATION com1 = { sizeof com1 };
+    HANDLE search = FindFirstDevice(DeviceSearchByLegacyName, L"COM1:", &com1);
+    const wchar_t *key = L"Drivers\\BuiltIn\\GPS_DEBUG_COM";
+    HKEY settings;
+    HANDLE device;
+
+    if (search != INVALID_HANDLE_VALUE) {
+        FindClose(search);
+        DeactivateDevice(com1.hDevice);
+    }
+    add_serial_port(1, com1_registers, L"TX_NMEA");
+    if (RegCreateKeyExW(HKEY_LOCAL_MACHINE, key, 0, NULL, 0, 0, NULL, &settings, NULL) != ERROR_SUCCESS)
+        return;
+    set_string(settings, L"Dll", DRIVER);
+    set_string(settings, L"Prefix", L"COM");
+    set_dword(settings, L"Index", 4);
+    set_dword(settings, L"DeviceArrayIndex", 1);
+    set_dword(settings, L"MaxMessageBytes", 0x5ee);
+    set_string(settings, L"RXQUEUE", L"TX_NMEA");
+    set_string(settings, L"TXQUEUE", L"RX_NMEA");
+    RegCloseKey(settings);
+    device = ActivateDeviceEx(key, NULL, 0, NULL);
+    log_line(L"LAUNCH: COM4: GPS copy -> %s", device ? L"ok" : L"FAILED");
 }
 
 static void add_serial_ports(void)
@@ -81,8 +131,9 @@ static void add_serial_ports(void)
     if (!CopyFileW(DEV DRIVER, L"\\Windows\\" DRIVER, FALSE))
         log_line(L"LAUNCH: cannot copy " DRIVER L" to \\Windows (error %d)", GetLastError());
 
-    add_serial_port(2, com1_registers + 0x10000);
-    add_serial_port(3, com1_registers + 0x20000);
+    add_serial_port(2, com1_registers + 0x10000, NULL);
+    add_serial_port(3, com1_registers + 0x20000, NULL);
+    add_gps_ports(com1_registers);
 }
 
 /* Starts a program. With `finish_ms`, waits that long for it to exit before going on. */
@@ -158,6 +209,18 @@ static BOOL wait_window(const wchar_t *class_name, const wchar_t *title, DWORD t
     return TRUE;
 }
 
+static void no_console_windows(void)
+{
+    HKEY console;
+
+    if (RegCreateKeyExW(HKEY_LOCAL_MACHINE, L"Drivers\\Console", 0, NULL, 0, 0, NULL, &console, NULL) != ERROR_SUCCESS) {
+        log_line(L"LAUNCH: cannot turn console output off");
+        return;
+    }
+    set_dword(console, L"OutputTo", 0xFFFFFFFF);
+    RegCloseKey(console);
+}
+
 int WINAPI WinMain(HINSTANCE instance, HINSTANCE previous, LPWSTR command_line, int show)
 {
     HWND taskbar = FindWindowW(L"HHTaskBar", NULL);
@@ -166,6 +229,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE previous, LPWSTR command_line, 
         ShowWindow(taskbar, SW_HIDE);
 
     add_serial_ports();
+    no_console_windows();
     start(DEV L"ceagent.exe", L"COM2:", 0);
     start(FLASH L"VwUserShell\\VwCommunicationExe.exe", L"", 0);
     /* On a paired unit the brand app installs the boot pictures and exits within seconds.

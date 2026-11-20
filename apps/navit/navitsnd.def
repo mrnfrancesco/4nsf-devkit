@@ -1,0 +1,4 @@
+; navitsnd.dll exports its own waveOutWrite under the name Navit imports (navitsnd.c)
+LIBRARY navitsnd.dll
+EXPORTS
+    waveOutWrite = navitsnd_waveOutWrite
