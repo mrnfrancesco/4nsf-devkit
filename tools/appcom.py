@@ -102,7 +102,7 @@ def decode(data, position=0):
         contents = data[position + 4:position + 4 + size]
         if len(contents) != size:
             raise ValueError("binary longer than the message")
-        value = utf16(contents)
+        value = utf16(contents) if kind == BINARY else None
         if value is None:
             try:
                 value = contents.decode("utf-8")
@@ -129,14 +129,15 @@ def decode(data, position=0):
 
 
 def utf16(contents):
-    """{"utf16": text} if `contents` is printable UTF-16 text with one 0 at the end, else None."""
+    """{"utf16": text} if `contents` is printable ASCII text as UTF-16 with one 0 at the end (the
+    country codes of 11011 / 11012), else None: other bytes that happen to decode stay as they are."""
     if len(contents) < 4 or len(contents) % 2 or not contents.endswith(b"\0\0"):
         return None
     try:
         text = contents[:-2].decode("utf-16-le")
     except UnicodeDecodeError:
         return None
-    return {"utf16": text} if text.isprintable() else None
+    return {"utf16": text} if text.isascii() and text.isprintable() else None
 
 
 def datagrams(sender_port, message):
