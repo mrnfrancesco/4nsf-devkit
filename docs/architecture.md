@@ -2,7 +2,7 @@
 
 Entry point of the documentation: the whole unit on one page, with a link to the document that specifies each part. Read this first; follow the links for byte-level detail.
 
-Legend: ✅ verified in binary / config / data · ✅ emulator = observed running in the emulator (CE 7 guest, stubbed hardware) · 🟡 inferred or single source · ❓ unknown. Every statement is backed by the linked document and carries its tag there; where that tag is not ✅ it is repeated here. Almost everything comes from **static analysis** of the official software. Seen running in the emulator (2026-11-16): the app mechanism (§7.5), the shared memory with car data, AppCom traffic, the unit's side of the dock link against the simulated radio (`emulator/radio.py`), the branded start of `VwBrandDevice` — details in the "Verified in the emulator" sections of [shared-memory.md](car/shared-memory.md) §10, [appcom.md](apps/appcom.md) §13, [can-signals.md](car/can-signals.md) §9, [car-link.md](car/car-link.md) §10. Nothing was tested on a real unit or measured on a car.
+Legend: ✅ verified in binary / config / data · ✅ emulator = observed running in the emulator (CE 7 guest, stubbed hardware) · ✅ unit = seen on a real unit in a car · 🟡 inferred or single source · ❓ unknown. Every statement is backed by the linked document and carries its tag there; where that tag is not ✅ it is repeated here. Almost everything comes from **static analysis** of the official software. Seen running in the emulator (2026-11-16): the app mechanism (§7.5), the shared memory with car data, AppCom traffic, the unit's side of the dock link against the simulated radio (`emulator/radio.py`), the branded start of `VwBrandDevice` — details in the "Verified in the emulator" sections of [shared-memory.md](car/shared-memory.md) §10, [appcom.md](apps/appcom.md) §13, [can-signals.md](car/can-signals.md) §9, [car-link.md](car/car-link.md) §10. On a real unit in a car (2026-11-20): own apps in the menu, car data through the shared memory, Navit with the GPS on `COM4:`, and a capture of AppCom traffic ([building-apps.md](apps/building-apps.md), [navit.md](apps/navit.md), [appcom.md](apps/appcom.md) §14). Nothing was measured electrically.
 
 ## 1. The unit in five lines
 
@@ -203,12 +203,12 @@ The unit never sends a raw CAN frame; everything it can change in the car is a B
 
 ## 8. Extension points
 
-Where own code can hook into the unit, from least to most invasive (nothing here was tried on a real unit):
+Where own code can hook into the unit, from least to most invasive (on a real unit: 1, reading car values in 2, receiving group messages in 3):
 
 | # | Hook | What it gives | Specified in |
 |---|---|---|---|
-| 1 | Folder under `Apps\` | own program in the menu ✅ emulator | [building-apps.md](apps/building-apps.md) |
-| 2 | Shared-memory client | read every car value ✅ emulator; send BAP requests 🟡 (✅ emulator only: the car-link process picks the request up) | [shared-memory.md](car/shared-memory.md) §8.1–§8.3 |
+| 1 | Folder under `Apps\` | own program in the menu ✅ emulator, ✅ unit | [building-apps.md](apps/building-apps.md) |
+| 2 | Shared-memory client | read every car value ✅ emulator, ✅ unit; send BAP requests 🟡 (✅ emulator only: the car-link process picks the request up) | [shared-memory.md](car/shared-memory.md) §8.1–§8.3 |
 | 3 | AppCom datagrams | events of the other programs (language, phone, GPS state, standby); join a message group ✅ emulator (incl. the car speed, group `SpeedInfoCan`); steer the shell's status bar and overlays ✅ emulator; the sound manager | [appcom.md](apps/appcom.md) §9, §11, §13, [media-audio.md](system/media-audio.md) §11.2 |
 | 4 | `WolfSpecial.dll` / HWL DLL | brand, VIN, cradle, brightness, power, hidden flash (calling convention ✅ emulator, against the stand-in DLL) | [hardware-layer.md](system/hardware-layer.md) §4.5 |
 | 5 | `nfBT.dll` or its window messages | phone functions of the stock Bluetooth core | [bluetooth.md](system/bluetooth.md) §9.1 |
