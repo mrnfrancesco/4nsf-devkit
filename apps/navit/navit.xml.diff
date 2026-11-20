@@ -1,7 +1,8 @@
 Changes to Navit 0.5.7's navit.xml for the 4NSF unit, applied by apps/navit/fetch.sh.
 Italy-centred start, full screen, bigger touch targets (and no duplicate small zoom buttons),
 flat map, GPS from COM4: (the unit's NMEA copy, see docs/apps/navit.md), maps from maps.xml
-(written by the launcher), layouts with absolute paths. navit.xml is part of Navit (GPL-2.0).
+(written by the launcher), layouts with absolute paths, spoken directions with the built-in eSpeak.
+navit.xml is part of Navit (GPL-2.0).
 
 --- a/navit.xml
 +++ b/navit.xml
@@ -60,7 +61,17 @@ flat map, GPS from COM4: (the unit's NMEA copy, see docs/apps/navit.md), maps fr
  		<!-- Vehicle with GPS enabled for direct communication on windows. Remove the line above if you use this. -->
  		<!-- <vehicle name="Local GPS" profilename="car" follow="1" enabled="yes" active="1"
  				source="serial:COM4 baudrate=4800 parity=N data=8 stop=1" > -->
-@@ -439,9 +439,8 @@
+@@ -416,7 +416,8 @@
+ 		If you have a speech synthesizer like festival lite installed, you can get turn by turn directions out of navit. Please set the "cps"-value to how many characters your tts engine approximately speaks per second.
+ 		The default is text output to the shell
+ 		-->
+-		<speech type="cmdline" data="PowerShell -Command &quot;Add-Type &#x2013;AssemblyName System.Speech; (New-Object System.Speech.Synthesis.SpeechSynthesizer).Speak(%s);&quot;"/>
++		<!-- 4NSF: Navit's built-in eSpeak, language from LANG like the menus; full path: NAVIT_SHAREDIR does not work here -->
++		<speech type="espeak" path="\My Flash Disk\Navit\espeak-data" cps="15"/>
+ 		<!--
+ 		Instead of using a speech synthesizer, navit can also play pre-recorded samples for each word.
+ 		See https://navit.readthedocs.io/en/latest/user/configuration/advanced/options.html#prerecorded-samples for details.
+@@ -439,9 +440,8 @@
  		</mapset>
  
  		<!-- If you dont want to use the sample map, either set enabled="no" in the next line or remove the xml file from the maps directory -->
@@ -72,7 +83,7 @@ flat map, GPS from COM4: (the unit's NMEA copy, see docs/apps/navit.md), maps fr
  
  		<!-- Mapset template for OpenStreetMap -->
  		<mapset enabled="no">
-@@ -466,8 +465,9 @@
+@@ -466,8 +466,9 @@
  		If two layouts with the same name are included, the first one takes precedence.
  		In the list below, we use the user-defined layouts first (in $NAVIT_USER_DATADIR), they take precedence. Being next in the list, the default layouts (in $NAVIT_SHAREDIR) will only be used if there is no user-defined layout that was already defined with the same name.
  		-->

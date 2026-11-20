@@ -4,7 +4,7 @@
 
 ![Choosing the maps](../img/navit-picker.png) ![Navit with a map of Rome, night colours](../img/navit-map.png)
 
-Status: works in the emulator ✅ (2026-11-17) and on a real unit in the car ✅ unit (2026-11-20). In the emulator Navit loads two maps at once, draws them, follows the GPS position while the unit's own navigation is running, finds an address and computes a route with turn-by-turn instructions. In the car (a map of Rome on the SD card) it got the GPS position next to the unit's own navigation, drew the map and computed routes fast enough to use, was usable by finger, switched between day and night colours, kept working after the unit's standby (ignition off and on again), and never crashed or restarted the unit; only the first start was a bit slow. Voice output is not implemented.
+Status: works in the emulator ✅ (2026-11-17) and on a real unit in the car ✅ unit (2026-11-20). In the emulator Navit loads two maps at once, draws them, follows the GPS position while the unit's own navigation is running, finds an address and computes a route with turn-by-turn instructions. In the car (a map of Rome on the SD card) it got the GPS position next to the unit's own navigation, drew the map and computed routes fast enough to use, was usable by finger, switched between day and night colours, kept working after the unit's standby (ignition off and on again), and never crashed or restarted the unit; only the first start was a bit slow. Spoken directions (eSpeak, built into Navit) work in the emulator ✅ emulator, including the request that makes the VW menu switch the car radio to the unit for each announcement; heard on the car's speakers ❓ not yet tried.
 
 The idea comes from [hupog/seat-portable-system-revival](https://github.com/hupog/seat-portable-system-revival), who first ran Navit on this hardware (a Seat Portable System), there as a *replacement* for the navigation.
 
@@ -29,6 +29,7 @@ Be patient: in the emulator Navit takes 2–3 minutes to appear, because QEMU ha
 - **Getting back to the VW menu.** Navit fills the screen and has no button for the VW menu, so Quit is the way back. If Navit is still running when you tap its menu entry, the VW menu brings it to the front instead of starting it twice.
 - **The car's pop-ups.** The VW menu's overlays (open door, parking sensors, phone call, screen off) appear over Navit ✅ unit. When one ends, the VW menu shows its own main screen, not Navit ✅ unit; the launcher notices and puts Navit back in front about half a second later ✅ emulator (door picture).
 - **Setting a destination.** *Actions → Town*. First tap the small icon left of the text field and choose the country: on this system Navit cannot tell which country you are in, and without one it finds no town. Then type the town, pick it, choose *Streets*, type part of the street name (any word of it, e.g. "castro" finds "Via Castro Pretorio"), pick it, and tap *Set as destination*. Navit computes the route and starts guiding: next turn top left, distance and arrival time top right; *Route → Description* lists every turn ✅ emulator (a 5.5 km route across Rome). House numbers work only where OpenStreetMap has them, and many Italian streets have none.
+- **Spoken directions.** Navit speaks each turn with its built-in eSpeak voice, in the language of its menus (`LANG`, which Navit takes from the Windows locale; ❓ which one the unit has). The loudspeaker icon on the right switches the voice off and on. To force a language, add `language="it"` (or `de`, `en`, …; the names are the files in `espeak-data/voices/`) to the `<speech>` line in `navit.xml`. The unit's own navigation speaks independently: if both guide at the same time, both voices are heard.
 - **Day and night.** Navit switches between light and dark map colours by itself, from the sun's position. If the map ever shows nothing but the route, *Settings → Display → Layout* is set to "Route" (a style that draws only the route line): choose "Car".
 
 ## Maps
@@ -94,7 +95,8 @@ Application10 = \My Flash Disk\Apps\navit\navit.exe
 - **Tried** ✅ unit (2026-11-20, one drive, a city map of Rome from the SD card): see Status at the top. The two `[NoResetAfterException]` lines were in place, but Navit never crashed, so they were not put to the test.
 - **Memory** ❓: Navit runs alongside the navigation, the menu, the phone and the media player. Fine with a city map; with a region or a whole country not tried. hupog, who ran Navit *instead of* the navigation, only reported slow drawing with big maps. Start with a region rather than a whole country.
 - **Speed**: fine with a city map and `FILTER=roads` ✅ unit; larger maps not tried.
-- **What Navit does not do here**: speak (that needs the unit's audio arbitration, [media-audio.md](../system/media-audio.md)), traffic messages, car data.
+- **Speech on the car's speakers** ❓: whether the radio switches to the unit in time for the first word (`CLAIM_LEAD` in `navitsnd.c`, 300 ms) and lowers its own programme.
+- **What Navit does not do here**: traffic messages, car data.
 
 ## How it works
 
@@ -104,7 +106,8 @@ Application10 = \My Flash Disk\Apps\navit\navit.exe
 |---|---|---|
 | `\My Flash Disk\Apps\navit\navit.exe` | `apps/navit/navit.c` | the **launcher**: the map picker. This is what the VW menu starts |
 | `\My Flash Disk\Apps\navit\NgAppInfo.xml`, `navit.png` | `apps/navit/` | the menu entry and its icon |
-| `\My Flash Disk\Navit\` | `apps/navit/navit/`, made by `fetch.sh` | **Navit** itself: `navit.exe` (8 MB, needs no other DLL), its settings `navit.xml`, day and night map styles, icons. English menus only, no voices |
+| `\My Flash Disk\Navit\` | `apps/navit/navit/`, made by `fetch.sh` | **Navit** itself: `navit.exe` (1.5 MB once `fetch.sh` has removed its debug information), its settings `navit.xml`, day and night map styles, icons, eSpeak's speech data `espeak-data\` (2.8 MB, every language). English menus only |
+| `\My Flash Disk\Navit\navitsnd.dll` | `apps/navit/navitsnd.c` | announces Navit's speech to the VW menu, so the car radio plays it (below) |
 | `\My Flash Disk\Navit\maps.xml` | written by the launcher | the maps ticked in the picker; Navit's settings include this file |
 | `\My Flash Disk\Navit\navit.log`, `data\` | written by Navit | Navit's log; last position, bookmarks, recent destinations |
 
@@ -123,6 +126,7 @@ While Navit runs, the launcher stays in the background and listens on its AppCom
 | first position: Rome | Navit later remembers the last position in `data\center.txt`; delete that file to go back |
 | full screen, larger text, icons and buttons; Navit's second, small pair of zoom buttons switched off | 480×272 touch screen, operated with a finger |
 | flat map, no automatic tilt | faster drawing |
+| speech with the built-in eSpeak, its data by full path | Navit's default speaks through a Windows desktop command that does not exist here |
 
 Navit always reads `navit.xml` from its own folder.
 
@@ -134,12 +138,26 @@ But the GPS driver also copies every position message to a second, debugging por
 
 The emulator copies its simulated GPS to a `COM4:` in the same way, so Navit sees the same thing there as on the unit ([emulator/README.md](../../emulator/README.md)).
 
+### Speech: why `navitsnd.dll`
+
+Docked, the unit is heard only through the car radio, and the radio plays the unit only when the VW menu asks it to. Every program that wants to be heard announces it with AppCom message 29; the menu turns "navigation advice" into a request for the radio's announcement channel ([media-audio.md](../system/media-audio.md) §5). The unit's navigation sends it around every prompt ✅ unit ([appcom.md](appcom.md) §14). Navit does not know about it.
+
+Navit's eSpeak keeps one sound stream (`waveOut`) open and writes to it only while it speaks. `fetch.sh` changes Navit's `navit.exe` so that its `waveOutWrite` comes from `navitsnd.dll` (`emulator/patches/redirect_imports.py --only waveOutWrite`; to make room for that it first removes Navit's debug information). The DLL then:
+
+- before the first sound after a silence, sends `[29, [2, 2, 0, -1, -1]]` (claim, type 2 = navigation advice) to the programs of group `Volume`, waits 300 ms for the radio, and plays;
+- one second after the last sound has played, sends `[29, [2, 2, 1, -1, -1]]` (release).
+
+Priority 2, not the 4 of the unit's navigation: the receivers keep one entry per priority, so sharing 4 would let one navigation's release end the other's announcement. With 2, Navit wins over music (5) and loses to a phone call (1). ✅ emulator: the messages arrive in this form (captured with `apps/appcom` on port 27019), about one pair per spoken turn. The simulated radio does not answer the radio's own protocol (BAP), so in the emulator the menu never gets as far as asking the radio for the channel; that part is ❓ until tried in a car.
+
+The launcher's window-watching and this DLL use the same AppCom port, 27114 (`<Port>` in `NgAppInfo.xml`): the launcher listens on it, the DLL only writes it into its messages as the sender.
+
 ### Emulator details
 
 - Navit opens text windows for its console output; in the emulator they sit behind it and show up on the Windows taskbar while Navit closes. The unit's settings turn console output off (`HKLM\Drivers\Console\OutputTo = -1` ✅), so they should not appear there 🟡.
 - Navit shows the Windows taskbar when it exits; the launcher hides it again. The unit has no taskbar.
+- `navitsnd.dll` writes `NAVITSND: claim` / `NAVITSND: release` to `emulator/work/serial.log`. The emulator has a sound device, so the speech runs, but nothing is heard.
 - The launcher writes `NAVIT: window after … ms`, `NAVIT: menu overlay state N` and `NAVIT: overlay ended, Navit back to the front` to `emulator/work/serial.log`; to see an overlay, open a door with the simulated radio (`emulator/radio.py --doors 01`, after one AppCom message 40, [building-apps.md](building-apps.md)); Navit's own log is `\My Flash Disk\Navit\navit.log` (fetch it with `.venv/bin/python emulator/deploy.py get`).
 
 ## Licences
 
-Navit is GPL-2.0. It is downloaded by `fetch.sh` (its source code is on the same release page) and never stored in this repository. `apps/navit/navit.xml.diff` modifies Navit's own `navit.xml`, so it is GPL-2.0 as well. The launcher and the scripts are MPL-2.0, like the rest of the kit. The maps are under the ODbL. See [NOTICE.md](../../NOTICE.md).
+Navit is GPL-2.0. It is downloaded by `fetch.sh` (its source code is on the same release page) and never stored in this repository. `fetch.sh` changes the downloaded `navit.exe` on your computer (debug information removed, one import redirected, see above); if you pass that copy on, the GPL applies to it like to the original. `apps/navit/navit.xml.diff` modifies Navit's own `navit.xml`, so it is GPL-2.0 as well. eSpeak's data, shipped with Navit, is GPL as well. The launcher and the scripts are MPL-2.0, like the rest of the kit. The maps are under the ODbL. See [NOTICE.md](../../NOTICE.md).

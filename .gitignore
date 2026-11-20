@@ -5,6 +5,7 @@
 /firmware/rom/
 /emulator/work/
 /apps/*/*.exe
+/apps/*/*.dll
 /apps/navit/navit/
 /apps/navit/maps/
 .venv/

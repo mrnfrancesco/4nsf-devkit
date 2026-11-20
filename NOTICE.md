@@ -33,7 +33,7 @@ The findings these files encode (hidden-flash layout, board API signatures, kern
 - Windows Embedded Compact 7 kernel image for QEMU: [Milek7/wince-qemu](https://github.com/Milek7/wince-qemu), release 2022-04-17 (contains Microsoft code; no licence stated upstream).
 - CeGCC cross-compiler image: `ghcr.io/enlyze/windows-ce-build-environment-arm` ([enlyze/cegcc-build](https://github.com/enlyze/cegcc-build)).
 - The unit's software: Volkswagen's public update package (© Garmin / Navigon / Volkswagen).
-- Navit for Windows CE, `navit-wince-v0.5.7.zip` from [navit-gps/navit](https://github.com/navit-gps/navit/releases/tag/v0.5.7) (GPL-2.0; source in the same release), by `apps/navit/fetch.sh` (`make app APP=navit`).
+- Navit for Windows CE, `navit-wince-v0.5.7.zip` from [navit-gps/navit](https://github.com/navit-gps/navit/releases/tag/v0.5.7) (GPL-2.0; source in the same release), by `apps/navit/fetch.sh` (`make app APP=navit`), with the eSpeak speech data it contains (`espeak-data/`, GPL). `fetch.sh` changes the downloaded `navit.exe` locally (debug information removed, `waveOutWrite` taken from `apps/navit/navitsnd.c`); nothing of it is stored in this repository.
 - OpenStreetMap extracts from [Geofabrik](https://download.geofabrik.de/) (© OpenStreetMap contributors, ODbL), by `apps/navit/build_map.sh` (`make map`); the maps built from them stay under the ODbL.
 - Python packages in `requirements.txt` (`pefile`, `vncdotool`, `nmeasim`, `crccheck`, `dissect.cstruct`, `Pillow`), Debian packages in `sdk/Containerfile`.
 

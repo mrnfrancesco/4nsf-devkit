@@ -16,8 +16,15 @@ curl -fsSL -o "$TMP/navit.zip" "$URL"
 echo "$SHA256  $TMP/navit.zip" | sha256sum -c --quiet
 rm -rf "$OUT"
 mkdir -p "$OUT"
-# the program, its settings, two map styles (day / night) and the icons; no voices, no translations
-unzip -q "$TMP/navit.zip" navit.exe navit.xml navit_layout_car.xml navit_layout_car_dark.xml 'icons/*' \
+# the program, its settings, two map styles (day / night), the icons and the speech data of the
+# built-in eSpeak (espeak-data, 2.8 MB, all languages); no translations of the menus
+unzip -q "$TMP/navit.zip" navit.exe navit.xml navit_layout_car.xml navit_layout_car_dark.xml 'icons/*' 'espeak-data/*' \
   -x 'icons/desktop_icons/*' icons/Makefile icons/cmake_install.cmake -d "$OUT"
 patch -s "$OUT/navit.xml" "$HERE/navit.xml.diff"
+# the release build carries 7 MB of debug information: drop it (faster to copy and to load), which
+# also frees the room in the header that the next step needs
+arm-mingw32ce-strip --strip-debug "$OUT/navit.exe"
+# speech on the car's speakers: Navit's waveOutWrite from navitsnd.dll (docs/apps/navit.md)
+cp "$HERE/navitsnd.dll" "$OUT/"
+python3 "$HERE/../../emulator/patches/redirect_imports.py" --only waveOutWrite --stub "$OUT/navitsnd.dll" "$OUT/navit.exe"
 echo ">> $OUT ready"

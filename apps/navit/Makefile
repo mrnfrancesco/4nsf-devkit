@@ -12,5 +12,9 @@ all: navit.exe navit/navit.exe
 navit.exe: navit.c
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< -lws2
 
-navit/navit.exe: fetch.sh navit.xml.diff
+# Navit's own waveOutWrite: announces its speech to the VW menu (navitsnd.c); fetch.sh puts it in navit/
+navitsnd.dll: navitsnd.c navitsnd.def
+	$(CC) $(CFLAGS) -shared -static -s -o $@ navitsnd.c navitsnd.def -lws2
+
+navit/navit.exe: fetch.sh navit.xml.diff navitsnd.dll
 	./fetch.sh
