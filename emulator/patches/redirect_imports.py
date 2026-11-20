@@ -2,10 +2,14 @@
 """Point the imports that the emulator's Windows cannot satisfy at a stub DLL.
 
 Usage: redirect_imports.py --kernel DIR --unit DIR --stub STUB.dll PROGRAM...
+       redirect_imports.py --only NAME[,NAME...] --stub STUB.dll PROGRAM...
 
   --kernel DIR   system DLLs of the emulator's Windows   (emulator/work/kernel/rom/modules)
   --unit DIR     system DLLs of the unit's Windows       (firmware/rom/modules)
   --stub FILE    DLL that provides the missing functions (emulator/work/stubs/cestub.dll)
+  --only NAMES   instead: take exactly these functions (imported by name) from STUB.dll, whether
+                 the system has them or not; the old slots keep their requests. apps/navit uses
+                 it to put its own waveOutWrite in front of Navit's (apps/navit/navitsnd.c).
 
 The unit's programs were built for Windows CE 6 and ask its COREDLL for a few functions
 that Windows Embedded Compact 7 no longer exports. A program with an unresolved import
@@ -76,16 +80,23 @@ def pad(blob, boundary):
 
 
 class Redirector:
-    def __init__(self, kernel, unit, stub_name):
+    def __init__(self, kernel, unit, stub_name, only=()):
         self.kernel = kernel            # what the emulator's Windows offers
         self.unit = unit                # what the unit's Windows offers: names for ordinals
         self.stub_name = stub_name
+        self.only = set(only)           # if given: exactly these functions, by name
 
     def missing_slots(self, pe):
-        """Yield (file offset of the slot's request, address of the slot, function name)."""
+        """Yield (file offset of the slot's request, address of the slot, function name,
+        ordinal to request in the old slot instead, or None to leave the request)."""
         base = pe.OPTIONAL_HEADER.ImageBase
         for descriptor in getattr(pe, "DIRECTORY_ENTRY_IMPORT", []):
             dll = descriptor.dll.decode().lower()
+            if self.only:
+                for slot in descriptor.imports:
+                    if slot.name and slot.name.decode() in self.only:
+                        yield None, slot.address, slot.name.decode(), None
+                continue
             if dll not in self.kernel:
                 continue                # not a system DLL: it ships next to the program
             available = self.kernel[dll]
@@ -138,7 +149,8 @@ class Redirector:
             rest += struct.pack("<IIII", name_rva, 0, name_rva, 0)      # request + terminator, slot + terminator
             table += struct.pack("<IIIII", lookup_rva, 0, 0, rest_rva, slot_rva)
 
-            struct.pack_into("<I", data, request_offset, BY_ORDINAL | existing_ordinal)     # step 1
+            if existing_ordinal is not None:
+                struct.pack_into("<I", data, request_offset, BY_ORDINAL | existing_ordinal)  # step 1
             if not self.repoint(pe, data, old_slot, optional.ImageBase + slot_rva):         # step 3
                 print(f"  warning: {function}: nothing in {os.path.basename(path)} refers to its slot")
 
@@ -199,13 +211,18 @@ class Redirector:
 
 def main():
     parser = argparse.ArgumentParser(usage=__doc__)
-    parser.add_argument("--kernel", required=True)
-    parser.add_argument("--unit", required=True)
+    parser.add_argument("--kernel")
+    parser.add_argument("--unit")
+    parser.add_argument("--only", type=lambda names: names.split(","), default=[])
     parser.add_argument("--stub", required=True)
     parser.add_argument("programs", nargs="+")
     args = parser.parse_args()
+    if not args.only and not (args.kernel and args.unit):
+        parser.error("give --kernel and --unit, or --only")
 
-    redirector = Redirector(exports_of_all(args.kernel), exports_of_all(args.unit), os.path.basename(args.stub))
+    redirector = Redirector(exports_of_all(args.kernel) if args.kernel else {},
+                            exports_of_all(args.unit) if args.unit else {},
+                            os.path.basename(args.stub), args.only)
     needed = set()
     for path in args.programs:
         functions = redirector.redirect(path)
@@ -215,7 +232,8 @@ def main():
 
     lacking = sorted(needed - set(exports(args.stub).values()))
     if lacking:
-        sys.exit(f"{args.stub} does not export: {' '.join(lacking)}\nAdd them to emulator/stubs/cestub.c")
+        sys.exit(f"{args.stub} does not export: {' '.join(lacking)}"
+                 + ("" if args.only else "\nAdd them to emulator/stubs/cestub.c"))
 
 
 if __name__ == "__main__":

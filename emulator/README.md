@@ -94,7 +94,7 @@ while it runs
 
 to build it (make emulator)
   build.sh       builds work/ from firmware/ (the eight steps above)
-  patches/       patch_kernel.py, redirect_imports.py: the two binary patchers build.sh uses
+  patches/       patch_kernel.py, redirect_imports.py: the two binary patchers build.sh uses (apps/navit/fetch.sh also uses redirect_imports.py --only)
   guest/         programs that run inside the emulator
   stubs/         stand-ins for DLLs the emulator's Windows lacks
 
