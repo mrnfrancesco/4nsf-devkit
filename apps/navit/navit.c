@@ -502,11 +502,37 @@ static void navit_up(HWND window, HWND navit)
     SetTimer(window, TIMER_WATCH, 500, NULL);
 }
 
+/* AppCom message 29 "navigation advice released" (priority 2, as navitsnd.c claims it) to the
+ * members of group Volume. navitsnd.dll releases one second after Navit's last sound; a Navit
+ * that quits or crashes within that second would leave the car radio on the announcement
+ * channel, so the launcher sends the release whenever Navit ends. Releasing an entry that is not
+ * claimed changes nothing. */
+static void release_navit_sound(void)
+{
+    static const unsigned short volume_group[] = { 27011, 27015, 27017, 27018, 27019 };
+    DWORD datagram[] = { 0, APPCOM_PORT, 4, 2, 8, 29, 4, 5, 8, 2, 8, 2, 8, 1, 8, (DWORD)-1, 8, (DWORD)-1 };
+    SOCKET udp = socket(AF_INET, SOCK_DGRAM, 0);
+    struct sockaddr_in to;
+    int i;
+
+    if (udp == INVALID_SOCKET)
+        return;
+    memset(&to, 0, sizeof to);
+    to.sin_family = AF_INET;
+    to.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    for (i = 0; i < (int)(sizeof volume_group / sizeof *volume_group); i++) {
+        to.sin_port = htons(volume_group[i]);
+        sendto(udp, (char *)datagram, sizeof datagram, 0, (struct sockaddr *)&to, sizeof to);
+    }
+    closesocket(udp);
+}
+
 static void navit_done(HWND window)
 {
     /* Navit shows the Windows CE taskbar when it exits; the unit has none, the emulator has */
     HWND taskbar = FindWindowW(L"HHTaskBar", NULL);
 
+    release_navit_sound();
     if (taskbar)
         ShowWindow(taskbar, SW_HIDE);
     navit_window = NULL;
