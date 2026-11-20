@@ -21,7 +21,15 @@ mkdir -p "$MAPS/src"
 
 # 1. download (again only if the server has a newer file), check the published MD5
 echo ">> $URL"
-curl -fL --progress-bar -z "$SRC" -o "$SRC" "$URL"
+# into .part first: an interrupted download must not destroy the kept extract
+rm -f "$SRC.part"
+if [ -f "$SRC" ]; then
+  curl -fL --progress-bar -z "$SRC" -o "$SRC.part" "$URL"
+else
+  curl -fL --progress-bar -o "$SRC.part" "$URL"
+fi
+[ ! -s "$SRC.part" ] || mv "$SRC.part" "$SRC"
+rm -f "$SRC.part"
 curl -fsSL "$URL.md5" | awk -v f="$SRC" '{print $1 "  " f}' | md5sum -c --quiet
 
 TMP=$(mktemp -d "$MAPS/.build-XXXXXX")
