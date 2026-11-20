@@ -19,7 +19,7 @@ SRC=$MAPS/src/$(echo "$REGION" | tr / _).osm.pbf
 URL=https://download.geofabrik.de/$REGION-latest.osm.pbf
 mkdir -p "$MAPS/src"
 
-# 1. download (again only if the server has a newer file), check the published MD5
+# 1. download (again only if the server has a newer file)
 echo ">> $URL"
 # into .part first: an interrupted download must not destroy the kept extract
 rm -f "$SRC.part"
@@ -30,7 +30,13 @@ else
 fi
 [ ! -s "$SRC.part" ] || mv "$SRC.part" "$SRC"
 rm -f "$SRC.part"
-curl -fsSL "$URL.md5" | awk -v f="$SRC" '{print $1 "  " f}' | md5sum -c --quiet
+# check the published MD5; Geofabrik sometimes publishes none: then read the whole file instead
+if MD5=$(curl -fsSL "$URL.md5"); then
+  echo "$MD5" | awk -v f="$SRC" '{print $1 "  " f}' | md5sum -c --quiet
+else
+  echo ">> no MD5 published, checking the whole file"
+  osmium fileinfo -e "$SRC" >/dev/null
+fi
 
 TMP=$(mktemp -d "$MAPS/.build-XXXXXX")
 trap 'rm -rf "$TMP"' EXIT
