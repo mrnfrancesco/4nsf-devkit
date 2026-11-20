@@ -103,7 +103,8 @@ static DWORD WINAPI pollProc(LPVOID ctx)
                     }
                 }
                 SetEvent(p->rxEvent);
-            }
+            } else if (GetLastError() != ERROR_TIMEOUT)
+                Sleep(100);             /* no writer yet, or an error: do not spin */
             continue;
         }
         while (!(reg32(p, UARTFR) & FR_RXFE)) {
@@ -173,6 +174,11 @@ DWORD COM_Init(LPCWSTR context)
     if (key[0] && regString(key, L"RXQUEUE", name, sizeof name)) {
         MSGQUEUEOPTIONS options = { sizeof options, 0, 100, sizeof p->line, TRUE };
         p->source = CreateMsgQueue(name, &options);             /* read end */
+        if (!p->source) {
+            OutputDebugStringW(L"PL011POLL: cannot open the RXQUEUE message queue");
+            LocalFree(p);
+            return 0;
+        }
     } else if (!key[0] || !regDword(key, L"IoBase", &iobase) || !iobase) {
         OutputDebugStringW(L"PL011POLL: no IoBase");
         LocalFree(p);
