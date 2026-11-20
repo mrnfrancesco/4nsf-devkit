@@ -4,7 +4,7 @@
 
 ![Choosing the maps](../img/navit-picker.png) ![Navit with a map of Rome, night colours](../img/navit-map.png)
 
-Status: works in the emulator ✅ (2026-11-17). Navit loads two maps at once, draws them, follows the GPS position while the unit's own navigation is running, finds an address and computes a route with turn-by-turn instructions. Never tried on a real unit; driving along a route and voice output not tried.
+Status: works in the emulator ✅ (2026-11-17) and on a real unit in the car ✅ unit (2026-11-20). In the emulator Navit loads two maps at once, draws them, follows the GPS position while the unit's own navigation is running, finds an address and computes a route with turn-by-turn instructions. In the car (a map of Rome on the SD card) it got the GPS position next to the unit's own navigation, drew the map and computed routes fast enough to use, was usable by finger, switched between day and night colours, kept working after the unit's standby (ignition off and on again), and never crashed or restarted the unit; only the first start was a bit slow. Voice output is not implemented.
 
 The idea comes from [hupog/seat-portable-system-revival](https://github.com/hupog/seat-portable-system-revival), who first ran Navit on this hardware (a Seat Portable System), there as a *replacement* for the navigation.
 
@@ -27,6 +27,7 @@ Be patient: in the emulator Navit takes 2–3 minutes to appear, because QEMU ha
 - **Choosing maps.** The first screen lists every map it finds, on the flash disk and on the SD card. Tick the ones you need: Navit uses all of them together, also for routes that cross from one to the next. Your choice is remembered for next time.
 - **Navit's menu.** Tap the map. *Actions* is where you set a destination; *Settings → Maps* switches the loaded maps on and off; **Quit** takes you back to the VW menu.
 - **Getting back to the VW menu.** Navit fills the screen and has no button for the VW menu, so Quit is the way back. If Navit is still running when you tap its menu entry, the VW menu brings it to the front instead of starting it twice.
+- **The car's pop-ups.** The VW menu's overlays (open door, parking sensors, phone call, screen off) appear over Navit ✅ unit. When one ends, the VW menu shows its own main screen, not Navit ✅ unit; the launcher notices and puts Navit back in front about half a second later ✅ emulator (door picture).
 - **Setting a destination.** *Actions → Town*. First tap the small icon left of the text field and choose the country: on this system Navit cannot tell which country you are in, and without one it finds no town. Then type the town, pick it, choose *Streets*, type part of the street name (any word of it, e.g. "castro" finds "Via Castro Pretorio"), pick it, and tap *Set as destination*. Navit computes the route and starts guiding: next turn top left, distance and arrival time top right; *Route → Description* lists every turn ✅ emulator (a 5.5 km route across Rome). House numbers work only where OpenStreetMap has them, and many Italian streets have none.
 - **Day and night.** Navit switches between light and dark map colours by itself, from the sun's position. If the map ever shows nothing but the route, *Settings → Display → Layout* is set to "Route" (a style that draws only the route line): choose "Car".
 
@@ -88,10 +89,11 @@ Application10 = \My Flash Disk\Apps\navit\navit.exe
 - Leave the other lines as they are, and keep the file's Windows line endings (CR LF).
 - After a crash, a report is still written to `\My Flash Disk\NAVIGON\ErrorReporter\`; Navit is closed and not restarted.
 
-### Unknowns on a real unit
+### On a real unit
 
-- **Memory** ❓: Navit runs alongside the navigation, the menu, the phone and the media player. hupog, who ran Navit *instead of* the navigation, only reported slow drawing with big maps. Start with a region rather than a whole country.
-- **Speed** ❓: drawing a map on a 533 MHz processor. Keep `FILTER=roads`.
+- **Tried** ✅ unit (2026-11-20, one drive, a city map of Rome from the SD card): see Status at the top. The two `[NoResetAfterException]` lines were in place, but Navit never crashed, so they were not put to the test.
+- **Memory** ❓: Navit runs alongside the navigation, the menu, the phone and the media player. Fine with a city map; with a region or a whole country not tried. hupog, who ran Navit *instead of* the navigation, only reported slow drawing with big maps. Start with a region rather than a whole country.
+- **Speed**: fine with a city map and `FILTER=roads` ✅ unit; larger maps not tried.
 - **What Navit does not do here**: speak (that needs the unit's audio arbitration, [media-audio.md](../system/media-audio.md)), traffic messages, car data.
 
 ## How it works
@@ -106,7 +108,9 @@ Application10 = \My Flash Disk\Apps\navit\navit.exe
 | `\My Flash Disk\Navit\maps.xml` | written by the launcher | the maps ticked in the picker; Navit's settings include this file |
 | `\My Flash Disk\Navit\navit.log`, `data\` | written by Navit | Navit's log; last position, bookmarks, recent destinations |
 
-When you tap **Start Navit**, the launcher writes `maps.xml`, starts Navit, waits for its window and brings it to the front (otherwise the VW menu would stay on top). When Navit exits, so does the launcher. The menu entry names Navit's window (class `NAVGRA`, title `Navit`), which is how the VW menu finds a Navit that is already running.
+When you tap **Start Navit**, the launcher writes `maps.xml`, starts Navit, waits for its window and brings it to the front (otherwise the VW menu would stay on top). When Navit exits, so does the launcher.
+
+While Navit runs, the launcher stays in the background and listens on its AppCom port (27114, group `Settings` in `NgAppInfo.xml`) for the VW menu's message 31, which tells which overlay the menu shows ([appcom.md](appcom.md) §9.2). If an overlay starts while Navit is in front, then when the value returns to 11 or 13 (nothing shown) and the VW menu holds the screen, the launcher brings Navit back to the front. This is needed because the menu, after an overlay, returns only to the programs it knows (navigation, phone, media player). The menu entry names Navit's window (class `NAVGRA`, title `Navit`), which is how the VW menu finds a Navit that is already running.
 
 ### Navit's settings
 
@@ -126,7 +130,7 @@ Navit always reads `navit.xml` from its own folder.
 
 The unit's GPS delivers its positions on the serial port `COM2:`. Only one program at a time can open that port, and the unit's navigation opens it at start-up and never lets go ✅. So Navit cannot read the GPS there.
 
-But the GPS driver also copies every position message to a second, debugging port, `COM4:`, which nothing on the unit uses ✅. Navit reads that copy: same positions, no conflict with the navigation. 🟡 Found by reading the driver's code; not yet tried on a unit. Details and addresses: [hardware-layer.md](../system/hardware-layer.md) §6.5.
+But the GPS driver also copies every position message to a second, debugging port, `COM4:`, which nothing on the unit uses ✅. Navit reads that copy: same positions, no conflict with the navigation. Found by reading the driver's code, and ✅ unit: Navit gets its position there while the unit's navigation runs. Details and addresses: [hardware-layer.md](../system/hardware-layer.md) §6.5.
 
 The emulator copies its simulated GPS to a `COM4:` in the same way, so Navit sees the same thing there as on the unit ([emulator/README.md](../../emulator/README.md)).
 
@@ -134,7 +138,7 @@ The emulator copies its simulated GPS to a `COM4:` in the same way, so Navit see
 
 - Navit opens text windows for its console output; in the emulator they sit behind it and show up on the Windows taskbar while Navit closes. The unit's settings turn console output off (`HKLM\Drivers\Console\OutputTo = -1` ✅), so they should not appear there 🟡.
 - Navit shows the Windows taskbar when it exits; the launcher hides it again. The unit has no taskbar.
-- The launcher writes `NAVIT: window after … ms` to `emulator/work/serial.log`; Navit's own log is `\My Flash Disk\Navit\navit.log` (fetch it with `.venv/bin/python emulator/deploy.py get`).
+- The launcher writes `NAVIT: window after … ms`, `NAVIT: menu overlay state N` and `NAVIT: overlay ended, Navit back to the front` to `emulator/work/serial.log`; to see an overlay, open a door with the simulated radio (`emulator/radio.py --doors 01`, after one AppCom message 40, [building-apps.md](building-apps.md)); Navit's own log is `\My Flash Disk\Navit\navit.log` (fetch it with `.venv/bin/python emulator/deploy.py get`).
 
 ## Licences
 

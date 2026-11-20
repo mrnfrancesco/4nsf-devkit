@@ -10,7 +10,13 @@
  *
  * The menu finds a running Navit by its window (class NAVGRA, title "Navit": NgAppInfo.xml) and
  * brings it to the front instead of starting this program again.
+ *
+ * While Navit runs, this program also listens on its AppCom port for the menu's overlay state
+ * (message 31, group Settings: door picture, parking sensors, phone call, ...). When an overlay
+ * that came up over Navit ends, the menu shows its own main screen; this program puts Navit
+ * back in front. Plain sockets, no AppCom DLL (docs/apps/appcom.md).
  */
+#include <winsock2.h>
 #include <windows.h>
 #include <stdio.h>
 #include <string.h>
@@ -20,6 +26,7 @@
 #define NAVIT_DIR    L"\\My Flash Disk\\Navit"
 #define NAVIT_EXE    NAVIT_DIR L"\\navit.exe"
 #define MAPS_XML     NAVIT_DIR L"\\maps.xml"
+#define APPCOM_PORT  27114        /* <Port> in NgAppInfo.xml */
 
 static const wchar_t *const map_folders[] = {
     NAVIT_DIR L"\\maps",
@@ -153,6 +160,117 @@ static void find_maps(void)
     }
 }
 
+/* ---- the menu's overlays -------------------------------------------------------------- */
+
+/*
+ * The menu (VwUserShell) sends AppCom message 31 [31, state] to group Settings whenever the
+ * winner of its priority flags changes (docs/system/user-shell.md section 4): 13 = nothing
+ * shown, 11 = the radio is not in normal operation (shown nothing over Navit in the car), any
+ * other value = an overlay or pop-up (1 incoming call, 4 parking sensors, 5 door picture, 6 call,
+ * 8 screen off, ...). It brings its own window to the front for them and, when they end, goes
+ * back to the program it knows (navigation, phone, media player), never to Navit.
+ *
+ * So: a timer notes when Navit was last in front; an overlay that starts within a moment of
+ * that is remembered, and when the state goes back to 11 / 13 Navit is put in front again,
+ * but only if the menu holds the screen then (not the phone program, say).
+ */
+#define WM_OVERLAY     (WM_APP + 4)     /* wparam = the menu's overlay state (AppCom message 31) */
+#define TIMER_WATCH    1                /* every 500 ms while Navit runs: is it in front? */
+#define TIMER_RESTORE  2                /* shortly after an overlay ended */
+#define NAVIT_RECENT   2000             /* ms: Navit counts as "was in front" this long */
+
+static HWND navit_window;               /* while Navit runs */
+static DWORD navit_front_at;            /* GetTickCount() when Navit was last seen in front */
+static BOOL overlay_over_navit, overlay_on;
+static int restore_tries;
+
+static BOOL overlay_state(int state)
+{
+    return state != 11 && state != 13;
+}
+
+/* Listener thread: datagrams [31, Int state] on the launcher's AppCom port -> WM_OVERLAY. Only
+ * this one message is looked at; the group's other messages are dropped. */
+static DWORD WINAPI appcom_thread(LPVOID parameter)
+{
+    static const DWORD expected[] = { 0, 0, 4, 2, 8, 31, 8 };  /* header, list of 2: Int 31, Int */
+    HWND window = parameter;
+    struct sockaddr_in address;
+    SOCKET udp = socket(AF_INET, SOCK_DGRAM, 0);
+    DWORD datagram[1100];               /* the largest datagram: 8 + 4000 bytes */
+    int length, i;
+
+    memset(&address, 0, sizeof address);
+    address.sin_family = AF_INET;
+    address.sin_port = htons(APPCOM_PORT);
+    address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    if (udp == INVALID_SOCKET || bind(udp, (struct sockaddr *)&address, sizeof address))
+        return 1;
+    for (;;) {
+        length = recvfrom(udp, (char *)datagram, sizeof datagram, 0, NULL, NULL);
+        if (length != 8 + 6 * 4 || datagram[0] != 0)    /* one datagram, nothing following */
+            continue;
+        for (i = 2; i < 7 && datagram[i] == expected[i]; i++)
+            ;
+        if (i == 7)
+            PostMessageW(window, WM_OVERLAY, (WPARAM)datagram[7], 0);
+    }
+}
+
+static BOOL menu_in_front(void)
+{
+    HWND menu = FindWindowW(L"VwUserShell", NULL), front = GetForegroundWindow();
+    DWORD menu_process = 0, front_process = 1;
+
+    if (!menu || !front)
+        return FALSE;
+    GetWindowThreadProcessId(menu, &menu_process);
+    GetWindowThreadProcessId(front, &front_process);
+    return menu_process == front_process;
+}
+
+static void overlay_changed(HWND window, int state)
+{
+    wchar_t line[64];
+
+    wsprintfW(line, L"NAVIT: menu overlay state %d", state);
+    OutputDebugStringW(line);
+    if (!navit_window)
+        return;
+    if (overlay_state(state)) {
+        if (!overlay_on)                /* the first of possibly several overlays in a row */
+            overlay_over_navit = GetForegroundWindow() == navit_window
+                                 || GetTickCount() - navit_front_at < NAVIT_RECENT;
+        overlay_on = TRUE;
+        KillTimer(window, TIMER_RESTORE);
+    } else if (overlay_on) {
+        overlay_on = FALSE;
+        if (overlay_over_navit) {       /* the menu raises its window after it sends 31: wait */
+            restore_tries = 4;
+            SetTimer(window, TIMER_RESTORE, 500, NULL);
+        }
+    }
+}
+
+static void timer(HWND window, UINT id)
+{
+    if (!navit_window || !IsWindow(navit_window))
+        return;
+    if (id == TIMER_WATCH) {
+        if (GetForegroundWindow() == navit_window)
+            navit_front_at = GetTickCount();
+        return;
+    }
+    /* TIMER_RESTORE: a few tries, 500 ms apart, in case the menu comes to the front late */
+    if (menu_in_front()) {
+        OutputDebugStringW(L"NAVIT: overlay ended, Navit back to the front");
+        SetForegroundWindow(navit_window);
+        InvalidateRect(navit_window, NULL, FALSE);
+    }
+    if (--restore_tries <= 0)
+        KillTimer(window, TIMER_RESTORE);
+}
+
 /* ---- Navit ----------------------------------------------------------------------------- */
 
 /*
@@ -204,9 +322,17 @@ static BOOL start_navit(HWND window)
 
 static void navit_up(HWND window, HWND navit)
 {
+    HANDLE thread;
+
     /* Navit does not come to the front by itself: the VW menu would stay above it */
     SetForegroundWindow(navit);
     ShowWindow(window, SW_HIDE);
+    navit_window = navit;
+    navit_front_at = GetTickCount();
+    SetTimer(window, TIMER_WATCH, 500, NULL);
+    thread = CreateThread(NULL, 0, appcom_thread, window, 0, NULL);
+    if (thread)
+        CloseHandle(thread);
 }
 
 static void navit_done(HWND window)
@@ -216,6 +342,7 @@ static void navit_done(HWND window)
 
     if (taskbar)
         ShowWindow(taskbar, SW_HIDE);
+    navit_window = NULL;
     DestroyWindow(window);
 }
 
@@ -368,6 +495,12 @@ static LRESULT CALLBACK window_procedure(HWND window, UINT msg, WPARAM wparam, L
     case WM_NAVIT_DONE:
         navit_done(window);
         return 0;
+    case WM_OVERLAY:
+        overlay_changed(window, (int)wparam);
+        return 0;
+    case WM_TIMER:
+        timer(window, (UINT)wparam);
+        return 0;
     case WM_NAVIT_FAILED:
         navit_starting = FALSE;
         message = L"Navit did not start.";
@@ -386,6 +519,7 @@ static LRESULT CALLBACK window_procedure(HWND window, UINT msg, WPARAM wparam, L
 int WINAPI WinMain(HINSTANCE instance, HINSTANCE previous, LPWSTR command_line, int show)
 {
     WNDCLASSW window_class;
+    WSADATA winsock;
     LOGFONTW logfont;
     HWND running;
     MSG msg;
@@ -399,6 +533,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE previous, LPWSTR command_line, 
         return 0;
     }
 
+    WSAStartup(MAKEWORD(2, 2), &winsock);
     find_maps();
     read_selection();
 
