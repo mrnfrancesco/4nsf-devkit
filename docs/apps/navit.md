@@ -129,6 +129,7 @@ While Navit runs, the launcher stays in the background and listens on its AppCom
 | full screen, larger text, icons and buttons; Navit's second, small pair of zoom buttons switched off | 480×272 touch screen, operated with a finger |
 | a house button after the zoom buttons | back to the VW menu without quitting (above) |
 | flat map, no automatic tilt | faster drawing |
+| start zoom 96 instead of 256; auto-zoom on, showing the next 30 s of driving (`autozoom="30"`), between zoom 48 and 384 | Navit's default view is several kilometres wide on this screen. Zoom ≈ 16 × map units per pixel; at 50 km/h this gives roughly 800 m across. The A button switches auto-zoom off |
 | speech with the built-in eSpeak, its data by full path | Navit's default speaks through a Windows desktop command that does not exist here |
 
 Navit always reads `navit.xml` from its own folder.

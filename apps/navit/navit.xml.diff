@@ -1,8 +1,9 @@
 Changes to Navit 0.5.7's navit.xml for the 4NSF unit, applied by apps/navit/fetch.sh.
 Italy-centred start, full screen, bigger touch targets (and no duplicate small zoom buttons), a home
 button that shows the VW menu and leaves Navit running (the launcher does it: navit.exe menu),
-flat map, GPS from COM4: (the unit's NMEA copy, see docs/apps/navit.md), maps from maps.xml
-(written by the launcher), layouts with absolute paths, spoken directions with the built-in eSpeak.
+flat map, closer start zoom with auto-zoom (30 s of driving on screen), GPS from COM4: (the unit's
+NMEA copy, see docs/apps/navit.md), maps from maps.xml (written by the launcher), layouts with
+absolute paths, spoken directions with the built-in eSpeak.
 navit.xml is part of Navit (GPL-2.0).
 
 --- a/navit.xml
@@ -12,7 +13,7 @@ navit.xml is part of Navit (GPL-2.0).
  	For other formats see https://navit.readthedocs.io/en/latest/user/configuration/Coordinate%20format.html.
  	-->
 -	<navit center="11.5666 48.1333" zoom="256" tracking="1" orientation="-1" recent_dest="250" drag_bitmap="0" default_layout="Car">
-+	<navit center="12.4964 41.9028" zoom="256" tracking="1" orientation="-1" recent_dest="250" drag_bitmap="0" default_layout="Car">
++	<navit center="12.4964 41.9028" zoom="96" autozoom_active="1" autozoom="30" autozoom_min="48" autozoom_max="384" tracking="1" orientation="-1" recent_dest="250" drag_bitmap="0" default_layout="Car">
  		<!-- Use one of gtk_drawing_area, qt_qpainter or sdl. On windows systems, use win32 -->
  		<graphics type="win32"/>
  
