@@ -17,7 +17,7 @@ echo "$SHA256  $TMP/navit.zip" | sha256sum -c --quiet
 rm -rf "$OUT"
 mkdir -p "$OUT"
 # the program, its settings, two map styles (day / night), the icons and the speech data of the
-# built-in eSpeak (espeak-data, 2.8 MB, all languages); no translations of the menus
+# built-in eSpeak (espeak-data, 2.8 MB, all languages); no translations: this build's menus stay English
 unzip -q "$TMP/navit.zip" navit.exe navit.xml navit_layout_car.xml navit_layout_car_dark.xml 'icons/*' 'espeak-data/*' \
   -x 'icons/desktop_icons/*' icons/Makefile icons/cmake_install.cmake -d "$OUT"
 patch -s "$OUT/navit.xml" "$HERE/navit.xml.diff"

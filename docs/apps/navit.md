@@ -28,8 +28,9 @@ Be patient: in the emulator Navit takes 2–3 minutes to appear, because QEMU ha
 - **Navit's menu.** Tap the map. *Actions* is where you set a destination; *Settings → Maps* switches the loaded maps on and off; **Quit** ends Navit and takes you back to the VW menu.
 - **Getting back to the VW menu.** The **house button** next to the zoom buttons shows the VW menu and leaves Navit running, route included ✅ emulator. **more → Navit** brings it back: the VW menu finds the running Navit and puts it in front instead of starting it twice.
 - **The car's pop-ups.** The VW menu's overlays (open door, parking sensors, phone call, screen off) appear over Navit ✅ unit. When one ends, the VW menu shows its own main screen, not Navit ✅ unit; the launcher notices and puts Navit back in front about half a second later ✅ emulator (door picture).
-- **Setting a destination.** *Actions → Town*. First tap the small icon left of the text field and choose the country: on this system Navit cannot tell which country you are in, and without one it finds no town. Then type the town, pick it, choose *Streets*, type part of the street name (any word of it, e.g. "castro" finds "Via Castro Pretorio"), pick it, and tap *Set as destination*. Navit computes the route and starts guiding: next turn top left, distance and arrival time top right; *Route → Description* lists every turn ✅ emulator (a 5.5 km route across Rome). House numbers work only where OpenStreetMap has them, and many Italian streets have none.
-- **Spoken directions.** Navit speaks each turn with its built-in eSpeak voice, in the language of its menus (`LANG`, which Navit takes from the Windows locale; ❓ which one the unit has). The loudspeaker icon on the right switches the voice off and on. To force a language, add `language="it"` (or `de`, `en`, …; the names are the files in `espeak-data/voices/`) to the `<speech>` line in `navit.xml`. The unit's own navigation speaks independently: if both guide at the same time, both voices are heard.
+- **Setting a destination.** *Actions → Town*. The country is already chosen: the one the car is in (its flag is left of the text field; tap it to pick another) ✅ emulator. Type the town, pick it, choose *Streets*, type part of the street name (any word of it, e.g. "castro" finds "Via Castro Pretorio"), pick it, and tap *Set as destination*. Navit computes the route and starts guiding: next turn top left, distance and arrival time top right; *Route → Description* lists every turn ✅ emulator (a 5.5 km route across Rome). House numbers work only where OpenStreetMap has them, and many Italian streets have none.
+- **Spoken directions.** Navit speaks each turn with its built-in eSpeak voice, in the VW menu's language (the launcher sets it each time it starts Navit; Slovenian has no eSpeak voice and stays as it was). The loudspeaker icon on the right switches the voice off and on.
+- **Menus in English.** Navit's own menus are always English: this Navit build ignores every language setting for them (it reports the Windows locale as "C"), so `fetch.sh` leaves the translations out. The unit's own navigation speaks independently: if both guide at the same time, both voices are heard.
 - **Day and night.** Navit switches between light and dark map colours by itself, from the sun's position. If the map ever shows nothing but the route, *Settings → Display → Layout* is set to "Route" (a style that draws only the route line): choose "Car".
 
 ## Maps
@@ -107,7 +108,8 @@ Application10 = \My Flash Disk\Apps\navit\navit.exe
 | `\My Flash Disk\Apps\navit\navit.exe` | `apps/navit/navit.c` | the **launcher**: the map picker. This is what the VW menu starts |
 | `\My Flash Disk\Apps\navit\NgAppInfo.xml`, `navit.png` | `apps/navit/` | the menu entry and its icon |
 | `\My Flash Disk\Navit\` | `apps/navit/navit/`, made by `fetch.sh` | **Navit** itself: `navit.exe` (1.5 MB once `fetch.sh` has removed its debug information), its settings `navit.xml`, day and night map styles, icons, eSpeak's speech data `espeak-data\` (2.8 MB, every language). English menus only |
-| `\My Flash Disk\Navit\navitsnd.dll` | `apps/navit/navitsnd.c` | announces Navit's speech to the VW menu, so the car radio plays it (below) |
+| `\My Flash Disk\Navit\navitsnd.dll` | `apps/navit/navitsnd.c` | announces Navit's speech to the VW menu, so the car radio plays it; gives Navit the default country (both below) |
+| `\My Flash Disk\Navit\data\country.txt` | written by the launcher | the country the car is in, two letters |
 | `\My Flash Disk\Navit\maps.xml` | written by the launcher | the maps ticked in the picker; Navit's settings include this file |
 | `\My Flash Disk\Navit\navit.log`, `data\` | written by Navit | Navit's log; last position, bookmarks, recent destinations |
 
@@ -152,6 +154,17 @@ Navit's eSpeak keeps one sound stream (`waveOut`) open and writes to it only whi
 - one second after the last sound has played, sends `[29, [2, 2, 1, -1, -1]]` (release).
 
 Priority 2, not the 4 of the unit's navigation: the receivers keep one entry per priority, so sharing 4 would let one navigation's release end the other's announcement. With 2, Navit wins over music (5) and loses to a phone call (1). ✅ emulator: the messages arrive in this form (captured with `apps/appcom` on port 27019), about one pair per spoken turn. The simulated radio does not answer the radio's own protocol (BAP), so in the emulator the menu never gets as far as asking the radio for the channel; that part is ❓ until tried in a car.
+
+### Country and voice language
+
+Navit asks for the country before a town search unless it has a default one, and the build `fetch.sh` downloads has no working way to set it: its `country_default()` only returns a cached value that nothing fills (the code that would read `LANG` is not in this build), and the country of the street under the car is not in the maps. The pieces that supply it:
+
+- **Launcher**: listens on its AppCom port (group `SpeedInfoGps` in `NgAppInfo.xml`) for the unit's navigation's message 11011, which carries the country of the current GPS position about once a second ([appcom.md](appcom.md) §9.8), and keeps it, as two letters, in `\My Flash Disk\Navit\data\country.txt` (also while Navit runs). Before the first GPS position ever, it writes the country of the VW menu's language (`eng-GBR` → `GB`).
+- **`navitsnd.dll`**, loaded inside Navit: checks that `country_default()` is exactly where expected in this `navit.exe` (address and code; the download is pinned by SHA-256), then fills its cache with that country and re-reads the file every 30 s, so a border crossing is followed. With any other `navit.exe` it does nothing.
+
+The voice language comes from the VW menu: the menu starts the launcher with ` language=ita-ITA`, and the launcher writes `language="it"` into the `<speech>` line of `navit.xml` before it starts Navit.
+
+✅ emulator: country file `GB` without GPS, `IT` after one message 11011 with "ITA"; town search opens with Italy chosen and finds Roma; `<speech … language="en">` with the menu in English.
 
 The launcher's window-watching and this DLL use the same AppCom port, 27114 (`<Port>` in `NgAppInfo.xml`): the launcher listens on it, the DLL only writes it into its messages as the sender.
 

@@ -18,6 +18,15 @@
  *
  * "navit.exe menu" (the home button on Navit's map, navit.xml.diff) shows the VW menu and leaves
  * Navit running behind it; the menu's entry for Navit brings it back.
+ *
+ * Country: the unit's navigation sends the country of the current GPS position about once a
+ * second (AppCom message 11011, group SpeedInfoGps). The launcher keeps the last one, as two
+ * letters, in \My Flash Disk\Navit\data\country.txt (before any GPS: the country of the VW menu's
+ * language); navitsnd.dll gives it to Navit as the default country of the town search.
+ *
+ * Voice: Navit's eSpeak speaks the VW menu's language (" language=ita-ITA" on the launcher's
+ * command line); the launcher writes it into the <speech> line of Navit's navit.xml. Navit's menus
+ * stay English: this Navit build ignores the language settings for them (docs/apps/navit.md).
  */
 #include <winsock2.h>
 #include <windows.h>
@@ -30,6 +39,9 @@
 #define NAVIT_EXE    NAVIT_DIR L"\\navit.exe"
 #define MAPS_XML     NAVIT_DIR L"\\maps.xml"
 #define APPCOM_PORT  27114        /* <Port> in NgAppInfo.xml */
+#define NAVIT_XML    NAVIT_DIR L"\\navit.xml"
+#define DATA_DIR     NAVIT_DIR L"\\data"           /* Navit's own data: last position, ... */
+#define COUNTRY_TXT  DATA_DIR L"\\country.txt"     /* last country seen, 2 letters; read by navitsnd.dll */
 
 static const wchar_t *const map_folders[] = {
     NAVIT_DIR L"\\maps",
@@ -124,7 +136,133 @@ static BOOL write_selection(void)
     return TRUE;
 }
 
-/* ---- map files ------------------------------------------------------------------------- */
+/* ---- language and country ------------------------------------------------------------- */
+
+static char vw_language[8];             /* "ita-ITA": the VW menu's language, from the command line */
+static char country[3];                 /* "IT": the country saved in country.txt */
+
+/* ISO 3166 alpha-3 + alpha-2, one after the other (from Navit's country.c) */
+static const char iso3_iso2[] =
+    "ANDADAREAEAFGAFATGAGAIAAIALBALARMAMANTANAGOAOATAAQARGARASMASAUTATAUSAUABWAWALAAXAZEAZBIHBABRBBBBGDBD"
+    "BELBEBFABFBGRBGBHRBHBDIBIBENBJBLMBLBMUBMBRNBNBOLBOBESBQBRABRBHSBSBTNBTBVTBVBWABWBLRBYBLZBZCANCACCKCC"
+    "CODCDCAFCFCOGCGCHECHCIVCICOKCKCHLCLCMRCMCHNCNCOLCOCRICRCUBCUCPVCVCUWCWCXRCXCYPCYCZECZDEUDEDJIDJDNKDK"
+    "DMADMDOMDODZADZECUECESTEEEGYEGESHEHERIERESPESETHETFINFIFJIFJFLKFKFSMFMFROFOFRAFRGABGAGBRGBGRDGDGEOGE"
+    "GUFGFGGYGGGHAGHGIBGIGRLGLGMBGMGINGNGLPGPGNQGQGRCGRSGSGSGTMGTGUMGUGNBGWGUYGYHKGHKHMDHMHNDHNHRVHRHTIHT"
+    "HUNHUIDNIDIRLIEISRILIMNIMINDINIOTIOIRQIQIRNIRISLISITAITJEYJEJAMJMJORJOJPNJPKENKEKGZKGKHMKHKIRKICOMKM"
+    "KNAKNPRKKPKORKRKWTKWCYMKYKAZKZLAOLALBNLBLCALCLIELILKALKLBRLRLSOLSLTULTLUXLULVALVLBYLYMARMAMCOMCMDAMD"
+    "MNEMEMAFMFMDGMGMHLMHMKDMKMLIMLMMRMMMNGMNMACMOMNPMPMTQMQMRTMRMSRMSMLTMTMUSMUMDVMVMWIMWMEXMXMYSMYMOZMZ"
+    "NAMNANCLNCNERNENFKNFNGANGNICNINLDNLNORNONPLNPNRUNRNIUNUNZLNZOMNOMPANPAPERPEPYFPFPNGPGPHLPHPAKPKPOLPL"
+    "SPMPMPCNPNPRIPRPSEPSPRTPTPLWPWPRYPYQATQAREUREROUROSRBRSRUSRURWARWSAUSASLBSBSYCSCSDNSDSWESESGPSGSHNSH"
+    "SVNSISJMSJSVKSKSLESLSMRSMSENSNSOMSOSURSRSSDSSSTPSTSLVSVSXMSXSYRSYSWZSZTCATCTCDTDATFTFTGOTGTHATHTJKTJ"
+    "TKLTKTLSTLTKMTMTUNTNTONTOTURTRTTOTTTUVTVTWNTWTZATZUKRUAUGAUGUMIUMUSAUSURYUYUZBUZVATVAVCTVCVENVEVGBVG"
+    "VIRVIVNMVNVUTVUWLFWFWSMWSXXKXKYEMYEMYTYTZAFZAZMBZMZWEZW";
+
+/* The VW menu's language codes (its language_files) and the names of eSpeak's voices */
+static const char *const languages[][2] = {
+    { "bul", "bg" }, { "cze", "cs" }, { "dan", "da" }, { "dut", "nl" }, { "eng", "en" },
+    { "fin", "fi" }, { "fre", "fr" }, { "ger", "de" }, { "gre", "el" }, { "hun", "hu" },
+    { "ita", "it" }, { "lav", "lv" }, { "lit", "lt" }, { "nob", "no" }, { "pol", "pl" },
+    { "por", "pt" }, { "rum", "ro" }, { "rus", "ru" }, { "scr", "hr" }, { "slo", "sk" },
+    { "spa", "es" }, { "swe", "sv" }, { "tur", "tr" },
+};
+
+/* alpha-2 of an alpha-3 country code, or NULL */
+static const char *iso2(const char *iso3)
+{
+    const char *p;
+
+    for (p = iso3_iso2; *p; p += 5)
+        if (!strncmp(p, iso3, 3))
+            return p + 3;
+    return NULL;
+}
+
+static void save_country(const char *two)
+{
+    HANDLE file;
+    DWORD written;
+
+    if (!strncmp(country, two, 2))
+        return;
+    memcpy(country, two, 2);
+    CreateDirectoryW(DATA_DIR, NULL);
+    file = CreateFileW(COUNTRY_TXT, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
+    if (file != INVALID_HANDLE_VALUE) {
+        WriteFile(file, country, 2, &written, NULL);
+        CloseHandle(file);
+    }
+}
+
+/* At start: the saved country; without one, the country of the VW menu's language. */
+static void init_country(void)
+{
+    HANDLE file = CreateFileW(COUNTRY_TXT, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+    DWORD size = 0;
+    const char *guess;
+
+    if (file != INVALID_HANDLE_VALUE) {
+        ReadFile(file, country, 2, &size, NULL);
+        CloseHandle(file);
+    }
+    if (size != 2) {
+        country[0] = 0;
+        if (strlen(vw_language) == 7 && (guess = iso2(vw_language + 4)) != NULL)
+            save_country(guess);
+    }
+}
+
+/* A country from message 11011 (3 letters): keep it, also while Navit runs (border crossings). */
+static void country_seen(const char *iso3)
+{
+    const char *two = iso2(iso3);
+
+    if (two)
+        save_country(two);
+}
+
+/* language="xx" in the <speech> line of navit.xml, for the VW menu's language. Navit has to read
+ * it at start, so this runs before Navit does. The file is rewritten only when the line changes. */
+static void set_voice_language(void)
+{
+    static char text[65536], out[65536 + 64];
+    const char *voice = NULL, *tag, *end, *old;
+    HANDLE file;
+    DWORD size = 0;
+    int i, n;
+
+    for (i = 0; i < (int)(sizeof languages / sizeof *languages); i++)
+        if (!strncmp(vw_language, languages[i][0], 3))
+            voice = languages[i][1];
+    if (!voice)
+        return;                             /* not started from the menu, or no such voice */
+    file = CreateFileW(NAVIT_XML, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+    if (file == INVALID_HANDLE_VALUE)
+        return;
+    ReadFile(file, text, sizeof text - 1, &size, NULL);
+    CloseHandle(file);
+    text[size] = 0;
+    if (size == sizeof text - 1 || !(tag = strstr(text, "<speech type=\"espeak\"")) || !(end = strchr(tag, '>')))
+        return;
+    old = strstr(tag, " language=\"");
+    if (old && old < end) {                 /* replace the value */
+        const char *value_end = strchr(old + 11, '"');
+        if (!value_end || value_end > end || ((size_t)(value_end - old - 11) == strlen(voice)
+                                              && !strncmp(old + 11, voice, strlen(voice))))
+            return;                         /* malformed, or already right */
+        n = sprintf(out, "%.*s language=\"%s\"%s", (int)(old - text), text, voice, value_end + 1);
+    } else {                                /* add it after the type */
+        const char *after = tag + strlen("<speech type=\"espeak\"");
+        n = sprintf(out, "%.*s language=\"%s\"%s", (int)(after - text), text, voice, after);
+    }
+    file = CreateFileW(NAVIT_XML, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
+    if (file != INVALID_HANDLE_VALUE) {
+        write_text(file, out);
+        CloseHandle(file);
+    }
+    (void)n;
+}
+
+/* ---- map files ---------------------------------------------------------------------- */
 
 static void find_maps(void)
 {
@@ -179,6 +317,7 @@ static void find_maps(void)
  */
 #define WM_OVERLAY     (WM_APP + 4)     /* wparam = the menu's overlay state (AppCom message 31) */
 #define WM_TO_MENU     (WM_APP + 5)     /* from "navit.exe menu": the user wants the VW menu */
+#define WM_COUNTRY     (WM_APP + 6)     /* wparam = 3 letters: country of the GPS position (11011) */
 #define TIMER_WATCH    1                /* every 500 ms while Navit runs: is it in front? */
 #define TIMER_RESTORE  2                /* shortly after an overlay ended */
 #define NAVIT_RECENT   2000             /* ms: Navit counts as "was in front" this long */
@@ -193,8 +332,9 @@ static BOOL overlay_state(int state)
     return state != 11 && state != 13;
 }
 
-/* Listener thread: datagrams [31, Int state] on the launcher's AppCom port -> WM_OVERLAY. Only
- * this one message is looked at; the group's other messages are dropped. */
+/* Listener thread on the launcher's AppCom port: [31, Int state] -> WM_OVERLAY; navigon's
+ * [11011, [speed, limit, 1, flag, country]], country = UTF-16 "ITA" + 0 -> WM_COUNTRY. The
+ * groups' other messages are dropped. */
 static DWORD WINAPI appcom_thread(LPVOID parameter)
 {
     static const DWORD expected[] = { 0, 0, 4, 2, 8, 31, 8 };  /* header, list of 2: Int 31, Int */
@@ -212,12 +352,20 @@ static DWORD WINAPI appcom_thread(LPVOID parameter)
         return 1;
     for (;;) {
         length = recvfrom(udp, (char *)datagram, sizeof datagram, 0, NULL, NULL);
-        if (length != 8 + 6 * 4 || datagram[0] != 0)    /* one datagram, nothing following */
+        if (length < 8 + 6 * 4 || datagram[0] != 0)     /* one datagram, nothing following */
             continue;
         for (i = 2; i < 7 && datagram[i] == expected[i]; i++)
             ;
-        if (i == 7)
+        if (i == 7 && length == 8 + 6 * 4)
             PostMessageW(window, WM_OVERLAY, (WPARAM)datagram[7], 0);
+        else if (length == 80 && datagram[2] == 4 && datagram[3] == 2 && datagram[4] == 8
+                 && datagram[5] == 11011 && datagram[6] == 4 && datagram[7] == 5
+                 && datagram[16] == 6 && datagram[17] == 8) {
+            const unsigned short *c = (const unsigned short *)&datagram[18];
+
+            if (c[0] < 128 && c[1] < 128 && c[2] < 128 && c[3] == 0)
+                PostMessageW(window, WM_COUNTRY, c[0] | c[1] << 8 | c[2] << 16, 0);
+        }
     }
 }
 
@@ -345,7 +493,6 @@ static BOOL start_navit(HWND window)
 
 static void navit_up(HWND window, HWND navit)
 {
-    HANDLE thread;
 
     /* Navit does not come to the front by itself: the VW menu would stay above it */
     SetForegroundWindow(navit);
@@ -353,9 +500,6 @@ static void navit_up(HWND window, HWND navit)
     navit_window = navit;
     navit_front_at = GetTickCount();
     SetTimer(window, TIMER_WATCH, 500, NULL);
-    thread = CreateThread(NULL, 0, appcom_thread, window, 0, NULL);
-    if (thread)
-        CloseHandle(thread);
 }
 
 static void navit_done(HWND window)
@@ -492,6 +636,7 @@ static void tap(HWND window, int x, int y)
             message = L"Cannot write " MAPS_XML;
             break;
         }
+        set_voice_language();
         if (GetFileAttributesW(NAVIT_EXE) == 0xFFFFFFFF) {
             message = L"Navit is missing: " NAVIT_EXE;
             break;
@@ -527,6 +672,11 @@ static LRESULT CALLBACK window_procedure(HWND window, UINT msg, WPARAM wparam, L
     case WM_TO_MENU:
         to_menu(window);
         return 0;
+    case WM_COUNTRY: {
+        char iso3[4] = { (char)wparam, (char)(wparam >> 8), (char)(wparam >> 16), 0 };
+        country_seen(iso3);
+        return 0;
+    }
     case WM_NAVIT_FAILED:
         navit_starting = FALSE;
         message = L"Navit did not start.";
@@ -547,6 +697,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE previous, LPWSTR command_line, 
     WNDCLASSW window_class;
     WSADATA winsock;
     LOGFONTW logfont;
+    HWND window;
+    HANDLE listener;
     HWND running;
     MSG msg;
 
@@ -573,6 +725,12 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE previous, LPWSTR command_line, 
     }
 
     WSAStartup(MAKEWORD(2, 2), &winsock);
+    {   /* the VW menu starts apps with " language=ita-ITA skin=VW" */
+        const wchar_t *language = wcsstr(command_line, L"language=");
+        if (language)
+            WideCharToMultiByte(CP_ACP, 0, language + 9, 7, vw_language, sizeof vw_language - 1, NULL, NULL);
+    }
+    init_country();
     find_maps();
     read_selection();
 
@@ -588,9 +746,13 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE previous, LPWSTR command_line, 
     window_class.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
     window_class.lpszClassName = CLASS_NAME;
     RegisterClassW(&window_class);
-    CreateWindowExW(WS_EX_TOPMOST, CLASS_NAME, TITLE, WS_POPUP | WS_VISIBLE,
-                    0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN),
-                    NULL, NULL, instance, NULL);
+    window = CreateWindowExW(WS_EX_TOPMOST, CLASS_NAME, TITLE, WS_POPUP | WS_VISIBLE,
+                             0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN),
+                             NULL, NULL, instance, NULL);
+    /* listen from the start: the country arrives while the user ticks the maps */
+    listener = CreateThread(NULL, 0, appcom_thread, window, 0, NULL);
+    if (listener)
+        CloseHandle(listener);
 
     while (GetMessageW(&msg, NULL, 0, 0)) {
         TranslateMessage(&msg);
