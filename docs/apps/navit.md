@@ -170,6 +170,7 @@ The launcher's window-watching and this DLL use the same AppCom port, 27114 (`<P
 
 ### Emulator details
 
+- **Driving a route**: `.venv/bin/python emulator/gps.py --track emulator/tracks/roma-nomentana.gpx --speed 50` (stop the GPS that `make run GPS=1` started first: `kill $(cat emulator/work/gps.pid)`) drives 3.7 km north along Via Nomentana in Rome. Set a destination near its end (*Actions → Coordinates*: `41.93300N 12.53180E`, *Set as destination*) to see guidance to the end; one off to the side (`41.92000N 12.50000E`) to see re-routing. ✅ emulator: next manoeuvre and distances count down, five announcements (claim / release each), guidance ends on arrival; with the side destination the distance grows and Navit recalculates. Other roads: `osmium extract` a small box from the OSM download in `apps/navit/maps/src/`, `osmium tags-filter` the road by name, `osmium export` to GeoJSON, and chain its pieces into a GPX (Navit's demo vehicle does not start in this build).
 - Navit prints to a console; the unit's settings send console output nowhere (`HKLM\Drivers\Console\OutputTo = -1` ✅), and the emulator's `launch.exe` sets the same, so no text windows appear ✅ emulator.
 - Navit shows the Windows taskbar when it exits; the launcher hides it again. The unit has no taskbar.
 - `navitsnd.dll` writes `NAVITSND: claim` / `NAVITSND: release` to `emulator/work/serial.log`. The emulator has a sound device, so the speech runs, but nothing is heard.
