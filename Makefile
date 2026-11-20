@@ -31,7 +31,9 @@ venv: .venv/.ok
 firmware:
 	$(SDK) firmware/fetch.sh
 
+# MAPS= rewrites the disk: never under a running emulator (checked here, on the host, where QEMU runs)
 emulator:
+	@[ -z "$(MAPS)" ] || ! emulator/emu status | grep -q running || { echo "the emulator is running: make stop first" >&2; exit 1; }
 	$(SDK) env $(if $(VIN),VIN=$(VIN)) $(if $(MAPS),MAPS="$(MAPS)") emulator/build.sh
 
 run:

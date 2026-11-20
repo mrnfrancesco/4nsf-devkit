@@ -96,14 +96,15 @@ fi
 
 if [ -n "${MAPS:-}" ]; then
   echo ">> 9. Navit maps into \\My Flash Disk\\Navit\\maps: $MAPS"
-  [ ! -f "$WORK/qemu.pid" ] || ! kill -0 "$(cat "$WORK/qemu.pid")" 2>/dev/null \
-    || { echo "the emulator is running: make stop first" >&2; exit 1; }
+  # (the Makefile checks that the emulator is stopped: QEMU runs on the host, not in this container)
   FAT="$WORK/disk.img@@$((2048 * 512))"
+  for map in $MAPS; do
+    [ -f "$ROOT/apps/navit/maps/$map.bin" ] || { echo "no apps/navit/maps/$map.bin: make map MAP=$map ..." >&2; exit 1; }
+  done
   # the guest's writes so far (deployed apps, settings) go into the base image first
   qemu-img commit -q "$WORK/disk.qcow2"
   mmd -i "$FAT" ::/Navit ::/Navit/maps 2>/dev/null || true
   for map in $MAPS; do
-    [ -f "$ROOT/apps/navit/maps/$map.bin" ] || { echo "no apps/navit/maps/$map.bin: make map MAP=$map ..." >&2; exit 1; }
     mcopy -o -i "$FAT" "$ROOT/apps/navit/maps/$map.bin" ::/Navit/maps/
   done
   rm -f "$WORK/disk.qcow2"
