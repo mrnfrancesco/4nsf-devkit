@@ -94,6 +94,16 @@ static void read_selection(void)
         if (!end)
             break;
         *end = 0;
+        {   /* "&amp;" back to '&' (xml_text) */
+            char *from = at, *to = at;
+            while (*from)
+                if (!strncmp(from, "&amp;", 5)) {
+                    *to++ = '&';
+                    from += 5;
+                } else
+                    *to++ = *from++;
+            *to = 0;
+        }
         MultiByteToWideChar(CP_UTF8, 0, at, -1, path, MAX_PATH);
         for (i = 0; i < map_count; i++)
             if (!_wcsicmp(path, maps[i].path))
@@ -108,6 +118,24 @@ static void write_text(HANDLE file, const char *text)
     WriteFile(file, text, strlen(text), &written, NULL);
 }
 
+/* UTF-8 of a file name for an XML attribute: '&' is the one character a file name can have that
+ * needs escaping ('"', '<' and '>' are not allowed in names) */
+static void xml_text(const wchar_t *text, char *out, int size)
+{
+    char utf8[MAX_PATH * 3];
+    const char *in;
+    int used = 0;
+
+    WideCharToMultiByte(CP_UTF8, 0, text, -1, utf8, sizeof utf8, NULL, NULL);
+    for (in = utf8; *in && used < size - 6; in++)
+        if (*in == '&') {
+            memcpy(out + used, "&amp;", 5);
+            used += 5;
+        } else
+            out[used++] = *in;
+    out[used] = 0;
+}
+
 static BOOL write_selection(void)
 {
     HANDLE file = CreateFileW(MAPS_XML, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
@@ -119,15 +147,12 @@ static BOOL write_selection(void)
                      "<!-- Written by the launcher (\\My Flash Disk\\Apps\\navit\\navit.exe) on every start. -->\n"
                      "<mapset enabled=\"yes\">\n");
     for (i = 0; i < map_count; i++) {
-        char path[MAX_PATH * 3], name[MAX_PATH * 3], line[sizeof path + sizeof name + 80];
+        char path[MAX_PATH * 5], name[MAX_PATH * 5], line[sizeof path + sizeof name + 80];
 
         if (!maps[i].selected)
             continue;
-        /* file names cannot contain '"', '<' or '>'; '&' is the one character to escape */
-        if (wcschr(maps[i].path, L'&'))
-            continue;
-        WideCharToMultiByte(CP_UTF8, 0, maps[i].path, -1, path, sizeof path, NULL, NULL);
-        WideCharToMultiByte(CP_UTF8, 0, maps[i].name, -1, name, sizeof name, NULL, NULL);
+        xml_text(maps[i].path, path, sizeof path);
+        xml_text(maps[i].name, name, sizeof name);
         sprintf(line, "  <map type=\"binfile\" enabled=\"yes\" description=\"%s\" data=\"%s\"/>\n", name, path);
         write_text(file, line);
     }
@@ -273,6 +298,8 @@ static void find_maps(void)
         wchar_t pattern[MAX_PATH];
         HANDLE search;
 
+        if (map_count >= MAX_MAPS)
+            break;
         wsprintfW(pattern, L"%s\\*.bin", map_folders[f]);
         search = FindFirstFileW(pattern, &found);
         if (search == INVALID_HANDLE_VALUE)
@@ -281,10 +308,12 @@ static void find_maps(void)
             struct map *map = &maps[map_count];
             wchar_t *dot;
 
-            if (found.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+            if (found.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY
+                || wcslen(map_folders[f]) + 1 + wcslen(found.cFileName) >= MAX_PATH)
                 continue;
             wsprintfW(map->path, L"%s\\%s", map_folders[f], found.cFileName);
-            wcscpy(map->name, found.cFileName);
+            wcsncpy(map->name, found.cFileName, MAX_PATH - 8);     /* room for " (card)" */
+            map->name[MAX_PATH - 8] = 0;
             if ((dot = wcsrchr(map->name, L'.')) != NULL)
                 *dot = 0;
             if (f > 0)
