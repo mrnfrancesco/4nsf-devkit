@@ -15,6 +15,9 @@
  * (message 31, group Settings: door picture, parking sensors, phone call, ...). When an overlay
  * that came up over Navit ends, the menu shows its own main screen; this program puts Navit
  * back in front. Plain sockets, no AppCom DLL (docs/apps/appcom.md).
+ *
+ * "navit.exe menu" (the home button on Navit's map, navit.xml.diff) shows the VW menu and leaves
+ * Navit running behind it; the menu's entry for Navit brings it back.
  */
 #include <winsock2.h>
 #include <windows.h>
@@ -175,6 +178,7 @@ static void find_maps(void)
  * but only if the menu holds the screen then (not the phone program, say).
  */
 #define WM_OVERLAY     (WM_APP + 4)     /* wparam = the menu's overlay state (AppCom message 31) */
+#define WM_TO_MENU     (WM_APP + 5)     /* from "navit.exe menu": the user wants the VW menu */
 #define TIMER_WATCH    1                /* every 500 ms while Navit runs: is it in front? */
 #define TIMER_RESTORE  2                /* shortly after an overlay ended */
 #define NAVIT_RECENT   2000             /* ms: Navit counts as "was in front" this long */
@@ -250,6 +254,25 @@ static void overlay_changed(HWND window, int state)
             SetTimer(window, TIMER_RESTORE, 500, NULL);
         }
     }
+}
+
+/* Show the VW menu. Navit stays where it is, behind it. */
+static void show_menu(void)
+{
+    HWND menu = FindWindowW(L"VwUserShell", NULL);
+
+    OutputDebugStringW(L"NAVIT: to the VW menu");
+    if (menu)
+        SetForegroundWindow(menu);
+}
+
+/* The user left Navit on purpose: an overlay now must not bring it back when it ends. */
+static void to_menu(HWND window)
+{
+    navit_front_at = GetTickCount() - NAVIT_RECENT;
+    overlay_over_navit = FALSE;
+    KillTimer(window, TIMER_RESTORE);
+    show_menu();
 }
 
 static void timer(HWND window, UINT id)
@@ -501,6 +524,9 @@ static LRESULT CALLBACK window_procedure(HWND window, UINT msg, WPARAM wparam, L
     case WM_TIMER:
         timer(window, (UINT)wparam);
         return 0;
+    case WM_TO_MENU:
+        to_menu(window);
+        return 0;
     case WM_NAVIT_FAILED:
         navit_starting = FALSE;
         message = L"Navit did not start.";
@@ -523,6 +549,19 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE previous, LPWSTR command_line, 
     LOGFONTW logfont;
     HWND running;
     MSG msg;
+
+    /* "navit.exe menu", from Navit's home button: hand over to the running launcher, which also
+     * stops watching for overlays over Navit; without one, show the menu directly */
+    while (*command_line == L' ')
+        command_line++;
+    if (!wcsncmp(command_line, L"menu", 4)) {
+        running = FindWindowW(CLASS_NAME, TITLE);
+        if (running)
+            PostMessageW(running, WM_TO_MENU, 0, 0);
+        else
+            show_menu();
+        return 0;
+    }
 
     /* already open (Navit or this picker): bring it to the front */
     running = FindWindowW(L"NAVGRA", L"Navit");

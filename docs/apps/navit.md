@@ -25,8 +25,8 @@ Be patient: in the emulator Navit takes 2–3 minutes to appear, because QEMU ha
 ## Using it
 
 - **Choosing maps.** The first screen lists every map it finds, on the flash disk and on the SD card. Tick the ones you need: Navit uses all of them together, also for routes that cross from one to the next. Your choice is remembered for next time.
-- **Navit's menu.** Tap the map. *Actions* is where you set a destination; *Settings → Maps* switches the loaded maps on and off; **Quit** takes you back to the VW menu.
-- **Getting back to the VW menu.** Navit fills the screen and has no button for the VW menu, so Quit is the way back. If Navit is still running when you tap its menu entry, the VW menu brings it to the front instead of starting it twice.
+- **Navit's menu.** Tap the map. *Actions* is where you set a destination; *Settings → Maps* switches the loaded maps on and off; **Quit** ends Navit and takes you back to the VW menu.
+- **Getting back to the VW menu.** The **house button** next to the zoom buttons shows the VW menu and leaves Navit running, route included ✅ emulator. **more → Navit** brings it back: the VW menu finds the running Navit and puts it in front instead of starting it twice.
 - **The car's pop-ups.** The VW menu's overlays (open door, parking sensors, phone call, screen off) appear over Navit ✅ unit. When one ends, the VW menu shows its own main screen, not Navit ✅ unit; the launcher notices and puts Navit back in front about half a second later ✅ emulator (door picture).
 - **Setting a destination.** *Actions → Town*. First tap the small icon left of the text field and choose the country: on this system Navit cannot tell which country you are in, and without one it finds no town. Then type the town, pick it, choose *Streets*, type part of the street name (any word of it, e.g. "castro" finds "Via Castro Pretorio"), pick it, and tap *Set as destination*. Navit computes the route and starts guiding: next turn top left, distance and arrival time top right; *Route → Description* lists every turn ✅ emulator (a 5.5 km route across Rome). House numbers work only where OpenStreetMap has them, and many Italian streets have none.
 - **Spoken directions.** Navit speaks each turn with its built-in eSpeak voice, in the language of its menus (`LANG`, which Navit takes from the Windows locale; ❓ which one the unit has). The loudspeaker icon on the right switches the voice off and on. To force a language, add `language="it"` (or `de`, `en`, …; the names are the files in `espeak-data/voices/`) to the `<speech>` line in `navit.xml`. The unit's own navigation speaks independently: if both guide at the same time, both voices are heard.
@@ -113,7 +113,9 @@ Application10 = \My Flash Disk\Apps\navit\navit.exe
 
 When you tap **Start Navit**, the launcher writes `maps.xml`, starts Navit, waits for its window and brings it to the front (otherwise the VW menu would stay on top). When Navit exits, so does the launcher.
 
-While Navit runs, the launcher stays in the background and listens on its AppCom port (27114, group `Settings` in `NgAppInfo.xml`) for the VW menu's message 31, which tells which overlay the menu shows ([appcom.md](appcom.md) §9.2). If an overlay starts while Navit is in front, then when the value returns to 11 or 13 (nothing shown) and the VW menu holds the screen, the launcher brings Navit back to the front. This is needed because the menu, after an overlay, returns only to the programs it knows (navigation, phone, media player). The menu entry names Navit's window (class `NAVGRA`, title `Navit`), which is how the VW menu finds a Navit that is already running.
+The house button runs Navit's command `spawn("\\My Flash Disk\\Apps\\navit\\navit.exe","menu")` (in Navit's commands a backslash must be doubled). That second copy of the launcher only tells the running one, which brings the VW menu (window class `VwUserShell`) to the front and notes that the user left Navit on purpose.
+
+While Navit runs, the launcher stays in the background and listens on its AppCom port (27114, group `Settings` in `NgAppInfo.xml`) for the VW menu's message 31, which tells which overlay the menu shows ([appcom.md](appcom.md) §9.2). If an overlay starts while Navit is in front, then when the value returns to 11 or 13 (nothing shown) and the VW menu holds the screen, the launcher brings Navit back to the front. This is needed because the menu, after an overlay, returns only to the programs it knows (navigation, phone, media player). After the house button Navit counts as "not in front", so an overlay then leaves you in the VW menu ✅ emulator. The menu entry names Navit's window (class `NAVGRA`, title `Navit`), which is how the VW menu finds a Navit that is already running.
 
 ### Navit's settings
 
@@ -125,6 +127,7 @@ While Navit runs, the launcher stays in the background and listens on its AppCom
 | maps and map styles loaded by full path | on Windows CE, Navit does not expand its path variables or wildcards (hupog found this first) |
 | first position: Rome | Navit later remembers the last position in `data\center.txt`; delete that file to go back |
 | full screen, larger text, icons and buttons; Navit's second, small pair of zoom buttons switched off | 480×272 touch screen, operated with a finger |
+| a house button after the zoom buttons | back to the VW menu without quitting (above) |
 | flat map, no automatic tilt | faster drawing |
 | speech with the built-in eSpeak, its data by full path | Navit's default speaks through a Windows desktop command that does not exist here |
 

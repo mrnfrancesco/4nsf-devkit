@@ -1,5 +1,6 @@
 Changes to Navit 0.5.7's navit.xml for the 4NSF unit, applied by apps/navit/fetch.sh.
-Italy-centred start, full screen, bigger touch targets (and no duplicate small zoom buttons),
+Italy-centred start, full screen, bigger touch targets (and no duplicate small zoom buttons), a home
+button that shows the VW menu and leaves Navit running (the launcher does it: navit.exe menu),
 flat map, GPS from COM4: (the unit's NMEA copy, see docs/apps/navit.md), maps from maps.xml
 (written by the launcher), layouts with absolute paths, spoken directions with the built-in eSpeak.
 navit.xml is part of Navit (GPL-2.0).
@@ -24,7 +25,7 @@ navit.xml is part of Navit (GPL-2.0).
  			<html>
  				<a name='Main Menu'><text>Main menu</text>
  					<a href='#Actions'><img src='gui_actions'>Actions</img></a>
-@@ -197,12 +197,12 @@
+@@ -197,12 +197,13 @@
          <osd type="text" label="${navigation.item[1].length[unit]}" x="0" y="94" w="60" h="20" font_size="200" enable_expression="navigation.nav_status&gt;=3"/>
          <osd type="text" label="${tracking.item.street_name} ${tracking.item.street_name_systematic}" x="0" y="-14" w="100%" h="14" font_size="200" enable_expression="vehicle.position_valid"/>
          <osd type="toggle_announcer" icon_src="%s" x="-32" y="-126" w="24" h="24"/>
@@ -38,12 +39,13 @@ navit.xml is part of Navit (GPL-2.0).
 +        <osd type="button" src="zoom_auto" command="autozoom_active=1" x="8" y="-56" w="48" h="48" osd_configuration="1" use_overlay="true" enable_expression="autozoom_active==0"/>
 +        <osd type="button" src="zoom_in" command="zoom_in()" x="64" y="-56" w="48" h="48" osd_configuration="1" use_overlay="true"/>
 +        <osd type="button" src="zoom_out" command="zoom_out()" x="120" y="-56" w="48" h="48" osd_configuration="1" use_overlay="true"/>
++        <osd type="button" src="gui_home" command='spawn("\\My Flash Disk\\Apps\\navit\\navit.exe","menu")' x="176" y="-56" w="48" h="48" osd_configuration="1" use_overlay="true"/>
 +        <osd type="button" src="follow" command="follow=0;set_center_cursor()" x="8" y="-112" w="48" h="48" enable_expression="follow&gt;1" use_overlay="true"/>
 +        <osd type="cmd_interface" update_period="1" command="pitch=autozoom_active==0?pitch:(follow&gt;1?0:0);orientation=autozoom_active==0?orientation:(follow&gt;1?0:-1)" x="-1" y="-1" w="1" h="1"/>
          <osd enabled="no" type="compass"/>
  		<osd enabled="no" type="navigation_next_turn"/>
  
-@@ -211,14 +211,14 @@
+@@ -211,14 +212,14 @@
  			It's always the top left corner of the icon, so you need to consider the icon's size when you enter the values. -->
  		<osd enabled="no" type="button" x="0" y="0" command="gui.fullscreen=!gui.fullscreen" src="toggle_fullscreen.png"/>
  		<osd enabled="no" type="button" x="-96" y="0" command="gui.menu(1)" src="menu.png"/>
@@ -61,7 +63,7 @@ navit.xml is part of Navit (GPL-2.0).
  		<!-- Vehicle with GPS enabled for direct communication on windows. Remove the line above if you use this. -->
  		<!-- <vehicle name="Local GPS" profilename="car" follow="1" enabled="yes" active="1"
  				source="serial:COM4 baudrate=4800 parity=N data=8 stop=1" > -->
-@@ -416,7 +416,8 @@
+@@ -416,7 +417,8 @@
  		If you have a speech synthesizer like festival lite installed, you can get turn by turn directions out of navit. Please set the "cps"-value to how many characters your tts engine approximately speaks per second.
  		The default is text output to the shell
  		-->
@@ -71,7 +73,7 @@ navit.xml is part of Navit (GPL-2.0).
  		<!--
  		Instead of using a speech synthesizer, navit can also play pre-recorded samples for each word.
  		See https://navit.readthedocs.io/en/latest/user/configuration/advanced/options.html#prerecorded-samples for details.
-@@ -439,9 +440,8 @@
+@@ -439,9 +441,8 @@
  		</mapset>
  
  		<!-- If you dont want to use the sample map, either set enabled="no" in the next line or remove the xml file from the maps directory -->
@@ -83,7 +85,7 @@ navit.xml is part of Navit (GPL-2.0).
  
  		<!-- Mapset template for OpenStreetMap -->
  		<mapset enabled="no">
-@@ -466,8 +466,9 @@
+@@ -466,8 +467,9 @@
  		If two layouts with the same name are included, the first one takes precedence.
  		In the list below, we use the user-defined layouts first (in $NAVIT_USER_DATADIR), they take precedence. Being next in the list, the default layouts (in $NAVIT_SHAREDIR) will only be used if there is no user-defined layout that was already defined with the same name.
  		-->
